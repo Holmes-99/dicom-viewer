@@ -52,6 +52,7 @@ mac:
   identity: null
 dmg:
   artifactName: ${productName}-${version}.${ext}
+  writeUpdateInfo: false # no auto-updates
 
 # fully offline: no update feed, no publishing from the build
 publish: null
