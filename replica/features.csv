@@ -78,6 +78,6 @@ Licensing / trial / activation,license,could,yes,skip,clone is free
 CD/DVD autorun edition with custom logo,distribution,must,yes,no,ground rule 5: Export > Prepare disc folder (study + DICOMDIR + portable viewer); milestone D3
 Desktop app: Windows installer (per-user; .dcm and DICOMDIR associated),distribution,must,yes,partial,D2: npm run dist builds a per-user NSIS installer (no admin) with .dcm/.dicom associated; the packaged program passes the D1 checks; installing on a clean PC not tried yet; DICOMDIR has no file extension so it can only be opened through Open with or the app
 Portable Windows version (no install),distribution,must,yes,partial,D2: one exe built; settings go next to it when writable else to temp; not launched by the tests yet (same program as the checked one)
-Mac app (.dmg; Apple Silicon + Intel),distribution,must,yes,partial,D2: config and a GitHub Actions job on a Mac machine (universal dmg + the desktop checks); never run yet: needs a push and a manual start
+Mac app (.dmg; Apple Silicon + Intel),distribution,must,yes,partial,D2: universal dmg built on GitHub's Mac machine and the 5 desktop checks pass on macOS (run 45084664960); not yet opened by a person on a real Mac; unsigned (right-click → Open the first time)
 Fully offline: no internet connection ever (enforced and tested),privacy,must,partial,yes,ground rule 6; D1: app:// only + content policy + every http/https/ws request cancelled + navigation blocked; e2e-desktop D01-H2
 Community translations and branding,brand,could,yes,skip,owned by the vendor and its community
