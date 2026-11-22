@@ -3,11 +3,11 @@ Open DICOM files and folders,open,must,yes,yes,F01; folder and file pickers (Ctr
 Open CD/DVD/USB with or without DICOMDIR,open,must,yes,partial,a disc opens as a folder (every file is scanned); DICOMDIR is skipped rather than used to speed up
 Open ZIP including AES password ZIP,open,must,yes,yes,Open menu or drop; plain and AES ZIPs checked; wrong password asks again; cancel stops cleanly
 Drag and drop files onto window,open,must,yes,yes,files and whole folders
-Uncompressed transfer syntaxes (implicit/explicit LE/BE),codecs,must,yes,partial,explicit LE verified with the demo study; implicit and big endian not tested yet
+Uncompressed transfer syntaxes (implicit/explicit LE/BE),codecs,must,yes,yes,explicit LE (demo); implicit LE and explicit BE render (e2e F01-E6 / F01-E7)
 JPEG baseline/lossless and JPEG-LS,codecs,must,yes,partial,codecs are bundled; no test files yet
 JPEG 2000 and High-Throughput JPEG 2000,codecs,must,yes,partial,codecs are bundled; no test files yet
 RLE and Deflated LE,codecs,must,yes,partial,RLE is in the loader; deflate not tested
-Multi-frame and US YBR colour images,codecs,must,yes,partial,multi-frame files expand to one image per frame; not tested
+Multi-frame and US YBR colour images,codecs,must,yes,partial,multi-frame checked (e2e F01-E8: one image per frame); US YBR colour not tested yet
 Safe parsing of malformed files,security,must,yes,partial,headers are read without pixel data and damaged files are skipped with a count; no fuzz suite yet
 Series thumbnail bar,browse,must,yes,yes,S02; drag a thumbnail onto any panel; panel number badge
 Open series window with search and sort (F4),browse,must,yes,yes,S03; type to filter and press Enter
@@ -22,12 +22,12 @@ Cine playback with fps,2D,must,yes,partial,C or the film button; 1-60 fps slider
 Auto sync series in the same plane,sync,must,yes,yes,on by default (VERIFY); links panels with the same frame of reference and plane; two axial series stayed on the same Z
 Cross-reference lines,sync,must,yes,yes,the active panel's plane is drawn on the others; follows scrolling (axial and coronal checked)
 Length measurement in mm,measure,must,yes,yes,
-Angle measurement,measure,must,yes,partial,built; not checked in the browser
+Angle measurement,measure,must,yes,yes,label in degrees (e2e F03-H3)
 Ellipse ROI with mean/min/max/area and HU,measure,must,yes,yes,lung mean -850 HU checked against the phantom
 Manual length calibration,measure,must,yes,yes,Length menu → Calibrate…; whole series; 140 mm line set to 70 mm read 70.0 mm; recalibrating works
-DICOM tag viewer with search and copy,metadata,must,yes,yes,F2 or the tags button; search; nested sequences; Enter copies a value; Copy all (clipboard not checked in the test browser)
+DICOM tag viewer with search and copy,metadata,must,yes,yes,F2 or the tags button; search; nested sequences; Enter copies a value (e2e F11-H3); Copy all
 Export to JPEG/BMP,export,must,yes,yes,Ctrl+S; JPEG / BMP / PNG; current image or whole series (into a chosen folder); encoders checked on the live panel
-Copy image to clipboard,export,must,yes,partial,built (Ctrl+C); not checked
+Copy image to clipboard,export,must,yes,yes,Ctrl+C puts a PNG on the clipboard (e2e F11-H4)
 Not-for-diagnostic-use notice or regulatory clearance,legal,must,n/a,yes,first-run notice that must be ticked
 Manual sync across different studies,sync,should,yes,no,
 Sync tolerant of non-parallel planes (5 degrees),sync,should,yes,partial,auto sync accepts planes within 5 degrees; no tilted test data yet
