@@ -3,18 +3,25 @@ import {
   ArrowDownUp, Circle, CircleHelp, Columns2, Contrast, Copy, Cuboid, Disc, Download, Film, FolderOpen, Hand, Info, Layers,
   LayoutGrid, Link2, Printer, RotateCw, Ruler, Server, Square, SunMoon, Tags, Triangle, Undo2, ZoomIn, Database, Sparkles,
 } from 'lucide-react'
-import { ToolButton, ToolSep, Toolbar, LayoutPicker } from '../ui/viewer'
+import { CineControl, ToolButton, ToolSep, Toolbar, LayoutPicker } from '../ui/viewer'
 import { Button, Checkbox } from '../ui/controls'
 import { Dialog, DialogClose, Progress, Toast, TooltipProvider, type MenuEntry } from '../ui/overlays'
 import { DataTable, type Column } from '../ui/DataTable'
 import { Popover } from 'radix-ui'
 import { webSource, filesFromDrop } from '../data/webSource'
 import { allSeries, findSeries, studyOf, type OpenProgress, type Series, type Session } from '../data/types'
-import { initEngine, setActiveTool, type ToolId } from './engine'
-import { CT_PRESETS, copyImage, flip, resetView, resetWindow, rotate, scrollBy, scrollTo, setWindow, toggleInvert } from './actions'
+import { initEngine, setActiveTool, setReferenceSource, setSyncedViewports, stackViewport, type ToolId } from './engine'
+import {
+  CT_PRESETS, calibrate, copyImage, flip, lastLength, playCine, resetView, resetWindow, rotate, scrollBy, scrollTo, setWindow, stopCine, toggleInvert,
+} from './actions'
 import { StackPanel } from './StackPanel'
 import { SeriesThumb } from './SeriesThumb'
+import { TagsDialog } from './TagsDialog'
+import { CalibrateDialog, ExportDialog, PasswordDialog } from './dialogs'
 import { fmtDate } from './format'
+import { ZipPasswordError } from '../data/zip'
+import type { DataSet } from 'dicom-parser'
+import { X } from 'lucide-react'
 
 const source = webSource
 const MAX = 25
@@ -41,8 +48,17 @@ export default function ViewerApp() {
   const [notice, setNotice] = useState(() => { try { return localStorage.getItem(NOTICE_KEY) !== '1' } catch { return true } })
   const [noticeAck, setNoticeAck] = useState(false)
   const [dropping, setDropping] = useState(false)
+  const [cine, setCine] = useState<{ panel: number; fps: number; loop: boolean; playing: boolean; series: string | null } | null>(null)
+  const [sync, setSync] = useState(true) // VERIFY: is auto sync on by default in the original?
+  const [refLines, setRefLines] = useState(true)
+  const [tags, setTags] = useState<{ header: DataSet | null; title: string } | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [calib, setCalib] = useState<{ length: number; unit: string } | null | false>(false)
+  const [pwRequest, setPwRequest] = useState<{ zipName: string; retry: boolean } | null>(null)
+  const pwAnswer = useRef<((p: string | null) => void) | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const folderInput = useRef<HTMLInputElement>(null)
+  const zipInput = useRef<HTMLInputElement>(null)
   const panelEls = useRef<(HTMLDivElement | null)[]>([])
 
   useEffect(() => {
@@ -86,13 +102,18 @@ export default function ViewerApp() {
       source.closeAll()
       loadSession(await run(setProgress))
     } catch (e) {
-      setToast({ tone: 'danger', title: 'Could not open the files', body: String(e) })
+      if (e instanceof ZipPasswordError) setToast({ tone: 'warning', title: 'Not opened', body: e.message })
+      else setToast({ tone: 'danger', title: 'Could not open the files', body: String(e) })
     } finally {
       setProgress(null)
     }
   }, [loadSession])
 
-  const openFiles = (files: FileList | File[] | null) => { if (files && files.length) open((p) => source.openFiles([...files], p)) }
+  const askPassword = (zipName: string, retry: boolean) => new Promise<string | null>((resolve) => {
+    pwAnswer.current = resolve
+    setPwRequest({ zipName, retry })
+  })
+  const openFiles = (files: FileList | File[] | null) => { if (files && files.length) open((p) => source.openFiles([...files], p, askPassword)) }
   const openDemo = () => open((p) => source.openDemo(p))
 
   // ------------------------------------------------------------ panel helpers
@@ -106,11 +127,67 @@ export default function ViewerApp() {
     if (el && (await copyImage(el).catch(() => false))) setToast({ tone: 'success', title: 'Image copied to the clipboard' })
   }
 
+  // ------------------------------------------------------------ cine
+  // cine belongs to one panel and one series; once the panel goes away or shows something else it is over
+  const liveCine = cine && cine.panel < count && panels[cine.panel] === cine.series ? cine : null
+  useEffect(() => { if (cine?.playing && !liveCine) stopCine(vpId(cine.panel)) }, [cine, liveCine])
+  const toggleCine = () => {
+    if (liveCine?.playing) { stopCine(vpId(liveCine.panel)); setCine({ ...liveCine, playing: false }); return }
+    const fps = cine?.fps ?? 15, loop = cine?.loop ?? true
+    const panel = liveCine ? liveCine.panel : active
+    if (playCine(vpId(panel), fps, loop)) setCine({ panel, fps, loop, playing: true, series: panels[panel] })
+    else setToast({ tone: 'warning', title: 'Nothing to play', body: 'The selected panel shows a single image.' })
+  }
+  const closeCine = () => { if (liveCine) stopCine(vpId(liveCine.panel)); setCine(null) }
+  const updateCine = (patch: { fps?: number; loop?: boolean }) => {
+    if (!liveCine) return
+    const next = { ...liveCine, ...patch }
+    if (next.playing) playCine(vpId(next.panel), next.fps, next.loop)
+    setCine(next)
+  }
+
+  // ------------------------------------------------------------ sync + reference lines
+  // Auto sync links panels whose series share the active one's frame of reference and plane (within 5°).
+  const visibleKey = panels.slice(0, count).join('|')
+  useEffect(() => {
+    if (!engineReady) return
+    const act = findSeries(session, panels[active])
+    const n0 = act && normal(act)
+    const ids: string[] = []
+    if (sync && act?.frameOfReference && n0) {
+      panels.slice(0, count).forEach((uid, i) => {
+        const se = findSeries(session, uid)
+        const n = se && normal(se)
+        if (se && n && se.frameOfReference === act.frameOfReference && Math.abs(dot(n, n0)) > Math.cos((5 * Math.PI) / 180)) ids.push(vpId(i))
+      })
+    }
+    // let newly enabled panels mount first
+    const t = setTimeout(() => setSyncedViewports(ids.length > 1 ? ids : []), 0)
+    return () => clearTimeout(t)
+  }, [engineReady, sync, session, active, visibleKey, count]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!engineReady) return
+    setReferenceSource(refLines && session && count > 1 ? activeId : null)
+  }, [engineReady, refLines, session, activeId, count, visibleKey])
+
+  // ------------------------------------------------------------ tags, export, calibrate
+  const openTags = () => {
+    const v = stackViewport(activeId)
+    const imageId = v?.getCurrentImageId()
+    const se = findSeries(session, panels[active])
+    setTags({
+      header: imageId ? (source.getHeader(imageId) as DataSet | undefined) ?? null : null,
+      title: se ? `${se.description || se.modality} · image ${(v?.getCurrentImageIdIndex() ?? 0) + 1}` : '',
+    })
+  }
+  const activeSeries = findSeries(session, panels[active])
+  const exportName = activeSeries ? `${activeSeries.modality}_Se${activeSeries.number ?? 0}` : 'image'
+
   // ------------------------------------------------------------ keyboard
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement
-      if (t.closest('input, textarea, select, [role=dialog], [role=menu]')) return
+      const t = e.target
+      if (t instanceof Element && t.closest('input, textarea, select, [role=dialog], [role=menu]')) return
       const k = e.key
       const ctrl = e.ctrlKey || e.metaKey
       const run = (f: () => void) => { e.preventDefault(); f() }
@@ -119,9 +196,12 @@ export default function ViewerApp() {
       if (ctrl && k.toLowerCase() === 't') return run(() => setShowOverlay((v) => !v))
       if (ctrl && k.toLowerCase() === 'r') return run(() => rotate(activeId, 90))
       if (ctrl && k.toLowerCase() === 'h') return run(() => flip(activeId, 'h'))
+      if (ctrl && k.toLowerCase() === 's' && session) return run(() => setExportOpen(true))
       if (ctrl) return
       if (k === 'F4') return run(() => setSeriesOpen(true))
       if (!session) return
+      if (k === 'F2') return run(openTags) // VERIFY the original's tags shortcut
+      if (k.toLowerCase() === 'c') return run(toggleCine) // VERIFY the original's cine shortcut
       if (k === 'ArrowUp' || k === 'ArrowLeft') return run(() => scrollBy(activeId, -1))
       if (k === 'ArrowDown' || k === 'ArrowRight') return run(() => scrollBy(activeId, 1))
       if (k === 'PageUp') return run(() => scrollBy(activeId, -10))
@@ -145,7 +225,7 @@ export default function ViewerApp() {
     { label: 'Open folder…', shortcut: 'Ctrl+O', icon: <FolderOpen size={14} />, onSelect: () => folderInput.current?.click() },
     { label: 'Open files…', shortcut: 'Ctrl+Shift+O', onSelect: () => fileInput.current?.click() },
     { label: 'Open disc', icon: <Disc size={14} />, disabled: true },
-    { label: 'Open ZIP archive…', disabled: true },
+    { label: 'Open ZIP archive…', onSelect: () => zipInput.current?.click() },
     { type: 'separator' },
     { label: 'Search PACS…', icon: <Server size={14} />, disabled: true },
     { label: 'Local archive…', icon: <Database size={14} />, disabled: true },
@@ -172,6 +252,14 @@ export default function ViewerApp() {
     { type: 'separator' },
     { label: 'Copy image', shortcut: 'Ctrl+C', onSelect: copy },
   ]
+  const syncMenu: MenuEntry[] = [
+    { type: 'check', label: 'Auto sync (same plane)', checked: sync, onChange: setSync },
+    { type: 'check', label: 'Reference lines', checked: refLines, onChange: setRefLines },
+  ]
+  const lengthMenu: MenuEntry[] = [
+    { label: 'Length', shortcut: 'L', onSelect: () => chooseTool('length') },
+    { label: 'Calibrate…', onSelect: () => setCalib(lastLength(activeId)) },
+  ]
   const t = (id: ToolId) => ({ active: !!session && tool === id, onClick: () => chooseTool(id), disabled: !session })
   const soon = (label: string, icon: ReactNode) => <ToolButton icon={icon} label={`${label} (coming soon)`} disabled />
 
@@ -179,13 +267,14 @@ export default function ViewerApp() {
   return (
     <TooltipProvider>
       <div
-        className="flex h-full flex-col"
+        className="flex h-full min-w-0 flex-col overflow-hidden"
         onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDropping(true) } }}
         onDragLeave={(e) => { if (e.currentTarget === e.target) setDropping(false) }}
         onDrop={async (e) => { if (!e.dataTransfer.types.includes('Files')) return; e.preventDefault(); setDropping(false); openFiles(await filesFromDrop(e.dataTransfer)) }}
       >
         <input ref={fileInput} type="file" multiple hidden onChange={(e) => { openFiles(e.target.files); e.target.value = '' }} />
         <input ref={folderInput} type="file" multiple hidden {...{ webkitdirectory: '' }} onChange={(e) => { openFiles(e.target.files); e.target.value = '' }} />
+        <input ref={zipInput} type="file" accept=".zip,application/zip" multiple hidden onChange={(e) => { openFiles(e.target.files); e.target.value = '' }} />
 
         <Toolbar>
           <ToolButton icon={<FolderOpen size={I} />} label="Open folder" shortcut="Ctrl+O" onClick={() => folderInput.current?.click()} menu={openMenu} />
@@ -203,7 +292,7 @@ export default function ViewerApp() {
           <ToolButton icon={<ZoomIn size={I} />} label="Zoom" shortcut="Z" {...t('zoom')} />
           <ToolButton icon={<Hand size={I} />} label="Pan" shortcut="P" {...t('pan')} />
           <ToolSep />
-          <ToolButton icon={<Ruler size={I} />} label="Length" shortcut="L" {...t('length')} />
+          <ToolButton icon={<Ruler size={I} />} label="Length" shortcut="L" {...t('length')} menu={lengthMenu} />
           <ToolButton icon={<Triangle size={I} />} label={tool === 'cobb' ? 'Cobb angle' : 'Angle'} shortcut="A" {...t(tool === 'cobb' ? 'cobb' : 'angle')}
             active={!!session && (tool === 'angle' || tool === 'cobb')}
             menu={[{ label: 'Angle', onSelect: () => chooseTool('angle') }, { label: 'Cobb angle', onSelect: () => chooseTool('cobb') }]} />
@@ -215,15 +304,15 @@ export default function ViewerApp() {
           <ToolButton icon={<Undo2 size={I} />} label="Reset view" shortcut="Esc" onClick={() => resetView(activeId)} disabled={!session} />
           <ToolButton icon={<Copy size={I} />} label="Copy image" shortcut="Ctrl+C" onClick={copy} disabled={!session} menu={viewMenu} />
           <ToolSep />
-          {soon('Synchronize', <Link2 size={I} />)}
-          {soon('Cine', <Film size={I} />)}
+          <ToolButton icon={<Link2 size={I} />} label={sync ? 'Auto sync: on' : 'Auto sync: off'} active={!!session && sync} onClick={() => setSync((v) => !v)} disabled={!session} menu={syncMenu} />
+          <ToolButton icon={<Film size={I} />} label={liveCine?.playing ? 'Pause cine' : 'Play cine'} shortcut="C" active={!!liveCine?.playing} onClick={toggleCine} disabled={!session} />
           <ToolSep />
           {soon('3D MPR', <Columns2 size={I} />)}
           {soon('Volume rendering', <Cuboid size={I} />)}
           <ToolSep />
-          {soon('Export', <Download size={I} />)}
+          <ToolButton icon={<Download size={I} />} label="Export images" shortcut="Ctrl+S" onClick={() => setExportOpen(true)} disabled={!session} />
           {soon('Print', <Printer size={I} />)}
-          {soon('DICOM tags', <Tags size={I} />)}
+          <ToolButton icon={<Tags size={I} />} label="DICOM tags" shortcut="F2" onClick={openTags} disabled={!session} />
           <div className="flex-1" />
           <ToolButton icon={<CircleHelp size={I} />} label="Help" menu={[{ label: 'About this viewer', onSelect: () => setNotice(true) }, { label: 'Design system page', onSelect: () => { location.hash = '#/design' } }]} />
         </Toolbar>
@@ -267,6 +356,16 @@ export default function ViewerApp() {
                 })}
               </div>
             )}
+            {liveCine && (
+              <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2">
+                <CineControl playing={liveCine.playing} fps={liveCine.fps} loop={liveCine.loop}
+                  onPlayingChange={toggleCine} onFpsChange={(fps) => updateCine({ fps })} onLoopChange={(loop) => updateCine({ loop })}
+                  extra={<>
+                    {count > 1 && <span className="text-xs text-muted">Panel {liveCine.panel + 1}</span>}
+                    <button aria-label="Close cine" onClick={closeCine} className="grid size-7 place-items-center rounded-md text-muted hover:bg-surface-hover hover:text-fg"><X size={14} /></button>
+                  </>} />
+              </div>
+            )}
             {!session && !progress && <StartScreen onFolder={() => folderInput.current?.click()} onFiles={() => fileInput.current?.click()} onDemo={openDemo} />}
             {dropping && (
               <div className="pointer-events-none absolute inset-2 grid place-items-center rounded-lg border-2 border-dashed border-accent bg-black/60 text-lg">Drop files or folders to open them</div>
@@ -278,6 +377,21 @@ export default function ViewerApp() {
 
         <SeriesDialog open={seriesOpen} onOpenChange={setSeriesOpen} session={session}
           onPick={(uid) => { showInActive(uid); setSeriesOpen(false) }} />
+
+        <TagsDialog open={!!tags} onOpenChange={(v) => { if (!v) setTags(null) }} header={tags?.header ?? null} title={tags?.title ?? ''}
+          onCopied={(what) => setToast({ tone: 'success', title: `Copied: ${what}` })} />
+
+        <ExportDialog key={`export-${exportOpen}`} open={exportOpen} onOpenChange={setExportOpen} viewportId={activeId}
+          getElement={() => panelEls.current[active] ?? null} baseName={exportName} onDone={setToast} />
+
+        <CalibrateDialog key={`calib-${calib ? calib.length : String(calib)}`} open={calib !== false} onOpenChange={(v) => { if (!v) setCalib(false) }} measured={calib || null}
+          onApply={(mm) => {
+            const ok = calibrate(activeId, mm)
+            setCalib(false)
+            setToast(ok ? { tone: 'success', title: 'Calibrated', body: `Lengths in this series now use your ${mm} mm reference.` } : { tone: 'danger', title: 'Calibration failed' })
+          }} />
+
+        <PasswordDialog key={pwRequest ? `pw-${pwRequest.zipName}-${pwRequest.retry}` : 'pw'} request={pwRequest} onAnswer={(p) => { setPwRequest(null); pwAnswer.current?.(p); pwAnswer.current = null }} />
 
         <Dialog open={notice} onOpenChange={(v) => { if (!v && (noticeAck || !isFirstRun())) setNotice(false) }} title="Before you start"
           footer={<Button variant="primary" disabled={isFirstRun() && !noticeAck} onClick={() => { try { localStorage.setItem(NOTICE_KEY, '1') } catch { /* private mode */ } setNotice(false) }}>Continue</Button>}>
@@ -293,6 +407,15 @@ export default function ViewerApp() {
     </TooltipProvider>
   )
 }
+
+/** Slice normal of a series (row × column direction), or null without orientation. */
+function normal(se: Series): [number, number, number] | null {
+  const o = se.instances[0]?.orientation
+  if (!o || o.length < 6) return null
+  const [a, b, c, d, e, f] = o
+  return [b * f - c * e, c * d - a * f, a * e - b * d]
+}
+const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 
 function isFirstRun() { try { return localStorage.getItem(NOTICE_KEY) !== '1' } catch { return true } }
 

@@ -30,17 +30,18 @@ export function StackPanel({
     re.enableElement({ viewportId, type: ViewportType.STACK, element: node, defaultOptions: { background: [0, 0, 0] as Types.Point3 } })
     ToolGroupManager.getToolGroup(TOOLGROUP_ID)?.addViewport(viewportId, re.id)
     // refit on size change (layout switch, window resize). VERIFY: does the original keep zoom on resize?
-    let raf = 0
+    // a timer, not requestAnimationFrame: frames stop while the window is minimised or covered,
+    // and the panel would come back stretched
+    let timer = 0
     const ro = new ResizeObserver(() => {
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => {
-        engine()?.resize(true, false)
-      })
+      clearTimeout(timer)
+      timer = window.setTimeout(() => engine()?.resize(true, false), 16)
     })
     ro.observe(node)
     const stop = (e: Event) => e.preventDefault()
     node.addEventListener('contextmenu', stop)
     return () => {
+      clearTimeout(timer)
       ro.disconnect()
       node.removeEventListener('contextmenu', stop)
       ToolGroupManager.getToolGroup(TOOLGROUP_ID)?.removeViewports(re.id, viewportId)

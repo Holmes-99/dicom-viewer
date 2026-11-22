@@ -1,7 +1,7 @@
 feature,area,priority,original,clone,notes
 Open DICOM files and folders,open,must,yes,yes,F01; folder and file pickers (Ctrl+O / Ctrl+Shift+O); browser data layer until the Tauri core exists
 Open CD/DVD/USB with or without DICOMDIR,open,must,yes,partial,a disc opens as a folder (every file is scanned); DICOMDIR is skipped rather than used to speed up
-Open ZIP including AES password ZIP,open,must,yes,no,
+Open ZIP including AES password ZIP,open,must,yes,yes,Open menu or drop; plain and AES ZIPs checked; wrong password asks again; cancel stops cleanly
 Drag and drop files onto window,open,must,yes,yes,files and whole folders
 Uncompressed transfer syntaxes (implicit/explicit LE/BE),codecs,must,yes,partial,explicit LE verified with the demo study; implicit and big endian not tested yet
 JPEG baseline/lossless and JPEG-LS,codecs,must,yes,partial,codecs are bundled; no test files yet
@@ -14,23 +14,23 @@ Open series window with search and sort (F4),browse,must,yes,yes,S03; type to fi
 Stack scroll with mouse wheel,2D,must,yes,yes,also arrows / PageUp / PageDown / Home / End
 Window/level drag and CT presets,2D,must,yes,yes,keys 1-6
 Zoom and pan,2D,must,yes,yes,right drag zooms and middle drag pans (VERIFY the original's mouse mapping)
-Rotate and flip,2D,must,yes,partial,built (Ctrl+R / Ctrl+H and the menu); not checked in the browser
-Invert (negative),2D,must,yes,partial,built (I); not checked in the browser
+Rotate and flip,2D,must,yes,yes,Ctrl+R / Ctrl+H and the menu; Esc resets; checked through the renderer state
+Invert (negative),2D,must,yes,yes,I
 Overlay text corners (patient/study/slice/WL),2D,must,yes,yes,Ctrl+T toggles it
 Split layouts up to 5x5,layout,must,yes,yes,1x2 verified
-Cine playback with fps,2D,must,yes,no,
-Auto sync series in the same plane,sync,must,yes,no,
-Cross-reference lines,sync,must,yes,no,
+Cine playback with fps,2D,must,yes,partial,C or the film button; 1-60 fps slider; loop or bounce; plays and pauses; the real frame rate was not measured (the test browser was throttled)
+Auto sync series in the same plane,sync,must,yes,yes,on by default (VERIFY); links panels with the same frame of reference and plane; two axial series stayed on the same Z
+Cross-reference lines,sync,must,yes,yes,the active panel's plane is drawn on the others; follows scrolling (axial and coronal checked)
 Length measurement in mm,measure,must,yes,yes,
 Angle measurement,measure,must,yes,partial,built; not checked in the browser
 Ellipse ROI with mean/min/max/area and HU,measure,must,yes,yes,lung mean -850 HU checked against the phantom
-Manual length calibration,measure,must,yes,no,
-DICOM tag viewer with search and copy,metadata,must,yes,no,
-Export to JPEG/BMP,export,must,yes,no,
+Manual length calibration,measure,must,yes,yes,Length menu → Calibrate…; whole series; 140 mm line set to 70 mm read 70.0 mm; recalibrating works
+DICOM tag viewer with search and copy,metadata,must,yes,yes,F2 or the tags button; search; nested sequences; Enter copies a value; Copy all (clipboard not checked in the test browser)
+Export to JPEG/BMP,export,must,yes,yes,Ctrl+S; JPEG / BMP / PNG; current image or whole series (into a chosen folder); encoders checked on the live panel
 Copy image to clipboard,export,must,yes,partial,built (Ctrl+C); not checked
 Not-for-diagnostic-use notice or regulatory clearance,legal,must,n/a,yes,first-run notice that must be ticked
 Manual sync across different studies,sync,should,yes,no,
-Sync tolerant of non-parallel planes (5 degrees),sync,should,yes,no,
+Sync tolerant of non-parallel planes (5 degrees),sync,should,yes,partial,auto sync accepts planes within 5 degrees; no tilted test data yet
 Duplicate window and multi-window,layout,should,yes,no,
 Cobb angle,measure,should,yes,partial,built; not checked
 Rectangle ROI,measure,should,yes,partial,built; not checked

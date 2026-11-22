@@ -1,4 +1,5 @@
 // Session tree: what `open_paths` returns in architecture.md. The Tauri core will return the same shape.
+import type { AskPassword } from './zip'
 
 export type Instance = {
   imageId: string            // how the renderer loads it ('dicomfile:3' in the browser, 'dcm://…' under Tauri)
@@ -53,7 +54,8 @@ export type OpenProgress = { done: number; total: number }
 
 /** Implemented by webSource (browser) now and tauriSource (Rust core) later. Screens use only this. */
 export interface DataSource {
-  openFiles(files: File[], onProgress?: (p: OpenProgress) => void): Promise<Session>
+  /** ZIP files in the list are unpacked; `askPassword` is called for encrypted ones */
+  openFiles(files: File[], onProgress?: (p: OpenProgress) => void, askPassword?: AskPassword): Promise<Session>
   openDemo(onProgress?: (p: OpenProgress) => void): Promise<Session>
   /** raw header for the DICOM tags window (S12) */
   getHeader(imageId: string): unknown

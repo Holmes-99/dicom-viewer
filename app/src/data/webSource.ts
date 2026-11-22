@@ -1,10 +1,44 @@
 import dicomImageLoader from '@cornerstonejs/dicom-image-loader'
+import { metaData } from '@cornerstonejs/core'
 import type { DataSet } from 'dicom-parser'
 import { buildSession, isDicomDir, parseHeader, type Parsed } from './index-files'
 import type { DataSource, OpenProgress, Session } from './types'
+import { isZip, unzip } from './zip'
 
 // Browser implementation of the data layer. Files stay in memory; nothing leaves the machine.
 const headers = new Map<string, DataSet>()
+
+/**
+ * Geometry for images that have not been loaded yet. The loader only knows an image's position once it has
+ * read the pixels; sync and reference lines need every slice's position up front, and we parsed every header
+ * when indexing. Low priority: the loader's own answer wins once it exists.
+ */
+function planeFromHeader(type: string, imageId: string) {
+  if (type !== 'imagePlaneModule') return undefined
+  const ds = headers.get(imageId.split('?')[0])
+  if (!ds) return undefined
+  const nums = (tag: string) => (ds.string(tag) ?? '').split('\\').map(Number).filter((n) => !Number.isNaN(n))
+  const pos = nums('x00200032'), ori = nums('x00200037')
+  if (pos.length !== 3 || ori.length !== 6) return undefined
+  const sp = nums('x00280030')
+  const [rowSpacing, colSpacing] = sp.length === 2 ? sp : [null, null]
+  return {
+    frameOfReferenceUID: ds.string('x00200052'),
+    rows: ds.uint16('x00280010'),
+    columns: ds.uint16('x00280011'),
+    imageOrientationPatient: ori,
+    rowCosines: ori.slice(0, 3),
+    columnCosines: ori.slice(3, 6),
+    imagePositionPatient: pos,
+    sliceThickness: ds.floatString('x00180050'),
+    sliceLocation: ds.floatString('x00201041'),
+    pixelSpacing: sp.length === 2 ? sp : undefined,
+    rowPixelSpacing: rowSpacing,
+    columnPixelSpacing: colSpacing,
+    usingDefaultValues: false,
+  }
+}
+metaData.addProvider(planeFromHeader, -1000)
 
 async function index(files: File[], onProgress?: (p: OpenProgress) => void): Promise<Session> {
   const parsed: Parsed[] = []
@@ -33,7 +67,14 @@ async function index(files: File[], onProgress?: (p: OpenProgress) => void): Pro
 }
 
 export const webSource: DataSource = {
-  openFiles: (files, onProgress) => index(files, onProgress),
+  async openFiles(files, onProgress, askPassword) {
+    const loose: File[] = []
+    for (const f of files) {
+      if (isZip(f)) loose.push(...(await unzip(f, askPassword)))
+      else loose.push(f)
+    }
+    return index(loose, onProgress)
+  },
 
   async openDemo(onProgress) {
     const names: string[] = await (await fetch('/demo/index.json')).json()

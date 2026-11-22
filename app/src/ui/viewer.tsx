@@ -49,7 +49,7 @@ export function Toolbar({ children, label = 'Viewer tools' }: { children: ReactN
     btns[(i + (e.key === 'ArrowRight' ? 1 : -1) + btns.length) % btns.length]?.focus()
   }
   return (
-    <div ref={ref} role="toolbar" aria-label={label} onKeyDown={onKey} className="flex h-11 items-center gap-0.5 border-b border-border bg-surface px-1.5">
+    <div ref={ref} role="toolbar" aria-label={label} onKeyDown={onKey} className="flex h-11 min-w-0 shrink-0 items-center gap-0.5 overflow-x-auto overflow-y-hidden border-b border-border bg-surface px-1.5 [scrollbar-width:none]">
       {children}
     </div>
   )
@@ -217,12 +217,23 @@ export function LayoutPicker({ value, onChange }: { value: [number, number]; onC
 }
 
 /* ---------- CineControl ---------- */
-export function CineControl() {
-  const [playing, setPlaying] = useState(false)
-  const [fps, setFps] = useState(15)
-  const [loop, setLoop] = useState(true)
+/** Controlled when the props are given (the viewer); self-contained otherwise (the design page). */
+export function CineControl(props: {
+  playing?: boolean; fps?: number; loop?: boolean
+  onPlayingChange?: (v: boolean) => void; onFpsChange?: (v: number) => void; onLoopChange?: (v: boolean) => void
+  extra?: ReactNode
+}) {
+  const [playingS, setPlayingS] = useState(false)
+  const [fpsS, setFpsS] = useState(15)
+  const [loopS, setLoopS] = useState(true)
+  const playing = props.playing ?? playingS
+  const fps = props.fps ?? fpsS
+  const loop = props.loop ?? loopS
+  const setPlaying = props.onPlayingChange ?? setPlayingS
+  const setFps = props.onFpsChange ?? setFpsS
+  const setLoop = props.onLoopChange ?? setLoopS
   return (
-    <div className="flex items-center gap-2 rounded-md bg-surface-raised/95 px-2 py-1 shadow-pop">
+    <div role="toolbar" aria-label="Cine" className="flex items-center gap-2 rounded-md bg-surface-raised/95 px-2 py-1 shadow-pop">
       <button aria-label={playing ? 'Pause' : 'Play'} onClick={() => setPlaying(!playing)} className="grid size-7 place-items-center rounded-md hover:bg-surface-hover">
         {playing ? <Pause size={16} /> : <Play size={16} />}
       </button>
@@ -234,6 +245,7 @@ export function CineControl() {
       <button aria-label={loop ? 'Loop (click for bounce)' : 'Bounce (click for loop)'} onClick={() => setLoop(!loop)} className="grid size-7 place-items-center rounded-md text-muted hover:bg-surface-hover hover:text-fg">
         {loop ? <Repeat size={14} /> : <ArrowDownUp size={14} />}
       </button>
+      {props.extra}
     </div>
   )
 }

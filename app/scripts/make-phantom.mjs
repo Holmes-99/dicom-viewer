@@ -1,6 +1,7 @@
 // Writes a synthetic CT study (no patient data, no third-party files) as DICOM Part 10, Explicit VR Little Endian.
 //   node scripts/make-phantom.mjs [outDir]       default: public/demo
 // Series 2: scout (1 image). Series 3: axial lung window (80 slices). Series 4: axial mediastinum (80 slices, same geometry).
+// Series 5: coronal reformat (48 slices, same frame of reference).
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -153,10 +154,45 @@ function writeScout() {
   ]))
 }
 
+// coronal reformat: same frame of reference, so reference lines and sync have a crossing plane to show
+const COR = 48, COR_STEP = 4, AX_SLICES = 80, AX_T = 2.5
+function writeCoronal() {
+  const seriesUid = uid(), rows = AX_SLICES, zTop = ((AX_SLICES - 1) / 2) * AX_T
+  for (let k = 0; k < COR; k++) {
+    const y = -((COR - 1) / 2) * COR_STEP + k * COR_STEP
+    const px = new Int16Array(N * rows)
+    for (let j = 0; j < rows; j++) for (let i = 0; i < N; i++) {
+      px[j * N + i] = Math.round(hu((i - N / 2) * SP, y, zTop - j * AX_T) + (Math.random() - 0.5) * 14) + 1024
+    }
+    const sop = uid()
+    writeFileSync(join(out, `s5_${String(k + 1).padStart(3, '0')}.dcm`), part10(CT, sop, [
+      [0x0008, 0x0008, 'CS', 'DERIVED\\SECONDARY\\REFORMATTED'],
+      [0x0008, 0x0016, 'UI', CT], [0x0008, 0x0018, 'UI', sop], [0x0008, 0x0031, 'TM', '091600'],
+      [0x0008, 0x103e, 'LO', 'Coronal 4 mm'],
+      ...study, ...patient,
+      [0x0018, 0x0050, 'DS', String(COR_STEP)],
+      [0x0020, 0x000e, 'UI', seriesUid], [0x0020, 0x0011, 'IS', '5'], [0x0020, 0x0013, 'IS', String(k + 1)],
+      [0x0020, 0x0032, 'DS', `${(-N / 2) * SP}\\${y}\\${zTop}`],
+      [0x0020, 0x0037, 'DS', '1\\0\\0\\0\\0\\-1'],
+      [0x0020, 0x0052, 'UI', forUid],
+      [0x0028, 0x0002, 'US', 1], [0x0028, 0x0004, 'CS', 'MONOCHROME2'],
+      [0x0028, 0x0010, 'US', rows], [0x0028, 0x0011, 'US', N],
+      [0x0028, 0x0030, 'DS', `${AX_T}\\${SP}`],
+      [0x0028, 0x0100, 'US', 16], [0x0028, 0x0101, 'US', 16], [0x0028, 0x0102, 'US', 15], [0x0028, 0x0103, 'US', 1],
+      [0x0028, 0x1050, 'DS', '40'], [0x0028, 0x1051, 'DS', '400'], [0x0028, 0x1052, 'DS', '-1024'], [0x0028, 0x1053, 'DS', '1'],
+      [0x7fe0, 0x0010, 'OW', new Uint8Array(px.buffer)],
+    ]))
+  }
+}
+
 writeScout()
-writeSeries({ number: 3, desc: 'Axial 2.5 mm lung', slices: 80, thickness: 2.5, wc: -600, ww: 1500, kernelNoise: 40 })
-writeSeries({ number: 4, desc: 'Axial 2.5 mm mediastinum', slices: 80, thickness: 2.5, wc: 40, ww: 400, kernelNoise: 14 })
-writeFileSync(join(out, 'index.json'), JSON.stringify(
-  ['s2_001.dcm', ...[3, 4].flatMap((s) => Array.from({ length: 80 }, (_, k) => `s${s}_${String(k + 1).padStart(3, '0')}.dcm`))],
-))
-console.log(`wrote 161 files to ${out}`)
+writeSeries({ number: 3, desc: 'Axial 2.5 mm lung', slices: AX_SLICES, thickness: AX_T, wc: -600, ww: 1500, kernelNoise: 40 })
+writeSeries({ number: 4, desc: 'Axial 2.5 mm mediastinum', slices: AX_SLICES, thickness: AX_T, wc: 40, ww: 400, kernelNoise: 14 })
+writeCoronal()
+const names = [
+  's2_001.dcm',
+  ...[3, 4].flatMap((s) => Array.from({ length: AX_SLICES }, (_, k) => `s${s}_${String(k + 1).padStart(3, '0')}.dcm`)),
+  ...Array.from({ length: COR }, (_, k) => `s5_${String(k + 1).padStart(3, '0')}.dcm`),
+]
+writeFileSync(join(out, 'index.json'), JSON.stringify(names))
+console.log(`wrote ${names.length} files to ${out}`)
