@@ -9,6 +9,7 @@ import { Dialog, DialogClose, Progress, Toast, TooltipProvider, type MenuEntry }
 import { DataTable, type Column } from '../ui/DataTable'
 import { Popover } from 'radix-ui'
 import { webSource, filesFromDrop } from '../data/webSource'
+import { desktop, fetchOpened } from '../data/desktop'
 import { allSeries, findSeries, studyOf, type OpenProgress, type Series, type Session } from '../data/types'
 import { initEngine, setActiveTool, setReferenceSource, setSyncedViewports, stackViewport, type ToolId } from './engine'
 import {
@@ -115,6 +116,18 @@ export default function ViewerApp() {
   })
   const openFiles = (files: FileList | File[] | null) => { if (files && files.length) open((p) => source.openFiles([...files], p, askPassword)) }
   const openDemo = () => open((p) => source.openDemo(p))
+
+  // desktop: files from a double-click, "Open with", a second launch or the disc launcher
+  const openHandedOver = useRef(openFiles)
+  useEffect(() => { openHandedOver.current = openFiles })
+  useEffect(() => {
+    if (!engineReady || !desktop) return
+    desktop.onOpenRequest(async (list) => {
+      setProgress({ done: 0, total: list.length * 2 })
+      const files = await fetchOpened(list, (done) => setProgress({ done, total: list.length * 2 }))
+      openHandedOver.current(files)
+    })
+  }, [engineReady])
 
   // ------------------------------------------------------------ panel helpers
   const activeId = vpId(active)
