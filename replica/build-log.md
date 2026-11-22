@@ -65,8 +65,20 @@ The demo study now also has a coronal series (series 5, 48 slices, same frame of
 - **Single instance:** a second launch hands its files to the open window and exits.
 - **Checks:** `npm run test:desktop` (5 checks, `e2e-desktop/d01-shell.spec.ts`), after `npm run build`. All 5 pass: loads with no Node; network, `file://`, websockets and navigation blocked; demo opens; folder on the command line opens; second launch hands over.
 
+## D2 packaging: what was built and checked (2026-11-23)
+
+- `npm run dist` (in `app/`) builds into `app/release/`:
+  - `DICOM Viewer-Setup-0.1.0.exe` (106 MB): a per-user installer that needs no admin rights. It adds Start menu and desktop shortcuts and links `.dcm` and `.dicom` files to the app. Uninstalling removes the settings too.
+  - `DICOM Viewer-Portable-0.1.0.exe` (106 MB): runs without installing. Settings go in a `DICOM Viewer data` folder next to it, or in the temp folder when that place is read-only (a CD).
+- `npm run test:packaged` runs the 5 desktop checks against the built program. **5 of 5 pass.**
+- The Mac `.dmg` can only be built on a Mac. `.github/workflows/build.yml` builds Windows and Mac on GitHub's machines, runs the checks, and keeps the files as downloads of that run. It runs only when started by hand or on a version tag, and it publishes nothing. **It has not run yet**, because the commits aren't pushed.
+- The name "DICOM Viewer", the app id and the default Electron icon are placeholders until `/replica-brand`.
+- The builds are unsigned (signing is Holmes-99's decision, see `deploy.md`). Windows shows "unknown publisher".
+- Harder than expected: the NSIS installer compiler can't read paths over 260 characters, and this folder is deep on disk. `scripts/dist.mjs` builds through a temporary drive letter (`subst`) and removes it afterwards.
+- `package.json`: the viewer's libraries moved to devDependencies. Vite bundles them into `dist/`, so the program ships only `dist/` and `electron/`, not `node_modules`.
+- Not tried yet: running the installer on a clean Windows 10/11 PC, double-clicking a `.dcm` after install, the portable exe from a USB stick, and the dmg on a Mac.
+
 ## Next
 
-1. D2 packaging: `npm run dist` builds the installer (with file association), portable exe and Mac dmg.
-2. D3 patient CD folder.
+1. D3 patient CD folder.
 3. The partial must-haves (DICOMDIR use, codec files, fuzz suite, cine fps).
