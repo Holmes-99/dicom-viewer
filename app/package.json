@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "demo": "node scripts/make-phantom.mjs",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
@@ -15,6 +16,7 @@
     "@cornerstonejs/tools": "^5.19.4",
     "@tailwindcss/vite": "^4.3.5",
     "dicom-parser": "^1.8.21",
+    "events": "^3.3.0",
     "lucide-react": "^1.77.0",
     "radix-ui": "^1.8.1",
     "react": "^19.3.1",

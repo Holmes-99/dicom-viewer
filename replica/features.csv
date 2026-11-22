@@ -1,46 +1,46 @@
 feature,area,priority,original,clone,notes
-Open DICOM files and folders,open,must,yes,no,F01
-Open CD/DVD/USB with or without DICOMDIR,open,must,yes,no,F01
+Open DICOM files and folders,open,must,yes,yes,F01; folder and file pickers (Ctrl+O / Ctrl+Shift+O); browser data layer until the Tauri core exists
+Open CD/DVD/USB with or without DICOMDIR,open,must,yes,partial,a disc opens as a folder (every file is scanned); DICOMDIR is skipped rather than used to speed up
 Open ZIP including AES password ZIP,open,must,yes,no,
-Drag and drop files onto window,open,must,yes,no,
-Uncompressed transfer syntaxes (implicit/explicit LE/BE),codecs,must,yes,no,
-JPEG baseline/lossless and JPEG-LS,codecs,must,yes,no,
-JPEG 2000 and High-Throughput JPEG 2000,codecs,must,yes,no,
-RLE and Deflated LE,codecs,must,yes,no,
-Multi-frame and US YBR colour images,codecs,must,yes,no,
-Safe parsing of malformed files,security,must,yes,no,original had CVE-2026-17264; fuzz the parser
-Series thumbnail bar,browse,must,yes,no,S02
-Open series window with search and sort (F4),browse,must,yes,no,S03
-Stack scroll with mouse wheel,2D,must,yes,no,
-Window/level drag and CT presets,2D,must,yes,no,
-Zoom and pan,2D,must,yes,no,
-Rotate and flip,2D,must,yes,no,
-Invert (negative),2D,must,yes,no,
-Overlay text corners (patient/study/slice/WL),2D,must,yes,no,
-Split layouts up to 5x5,layout,must,yes,no,
+Drag and drop files onto window,open,must,yes,yes,files and whole folders
+Uncompressed transfer syntaxes (implicit/explicit LE/BE),codecs,must,yes,partial,explicit LE verified with the demo study; implicit and big endian not tested yet
+JPEG baseline/lossless and JPEG-LS,codecs,must,yes,partial,codecs are bundled; no test files yet
+JPEG 2000 and High-Throughput JPEG 2000,codecs,must,yes,partial,codecs are bundled; no test files yet
+RLE and Deflated LE,codecs,must,yes,partial,RLE is in the loader; deflate not tested
+Multi-frame and US YBR colour images,codecs,must,yes,partial,multi-frame files expand to one image per frame; not tested
+Safe parsing of malformed files,security,must,yes,partial,headers are read without pixel data and damaged files are skipped with a count; no fuzz suite yet
+Series thumbnail bar,browse,must,yes,yes,S02; drag a thumbnail onto any panel; panel number badge
+Open series window with search and sort (F4),browse,must,yes,yes,S03; type to filter and press Enter
+Stack scroll with mouse wheel,2D,must,yes,yes,also arrows / PageUp / PageDown / Home / End
+Window/level drag and CT presets,2D,must,yes,yes,keys 1-6
+Zoom and pan,2D,must,yes,yes,right drag zooms and middle drag pans (VERIFY the original's mouse mapping)
+Rotate and flip,2D,must,yes,partial,built (Ctrl+R / Ctrl+H and the menu); not checked in the browser
+Invert (negative),2D,must,yes,partial,built (I); not checked in the browser
+Overlay text corners (patient/study/slice/WL),2D,must,yes,yes,Ctrl+T toggles it
+Split layouts up to 5x5,layout,must,yes,yes,1x2 verified
 Cine playback with fps,2D,must,yes,no,
 Auto sync series in the same plane,sync,must,yes,no,
 Cross-reference lines,sync,must,yes,no,
-Length measurement in mm,measure,must,yes,no,
-Angle measurement,measure,must,yes,no,
-Ellipse ROI with mean/min/max/area and HU,measure,must,yes,no,
+Length measurement in mm,measure,must,yes,yes,
+Angle measurement,measure,must,yes,partial,built; not checked in the browser
+Ellipse ROI with mean/min/max/area and HU,measure,must,yes,yes,lung mean -850 HU checked against the phantom
 Manual length calibration,measure,must,yes,no,
-DICOM tag viewer with search and copy,metadata,must,yes,no,S12
+DICOM tag viewer with search and copy,metadata,must,yes,no,
 Export to JPEG/BMP,export,must,yes,no,
-Copy image to clipboard,export,must,yes,no,
-Not-for-diagnostic-use notice or regulatory clearance,legal,must,n/a,no,decision needed (see recon.md)
+Copy image to clipboard,export,must,yes,partial,built (Ctrl+C); not checked
+Not-for-diagnostic-use notice or regulatory clearance,legal,must,n/a,yes,first-run notice that must be ticked
 Manual sync across different studies,sync,should,yes,no,
 Sync tolerant of non-parallel planes (5 degrees),sync,should,yes,no,
 Duplicate window and multi-window,layout,should,yes,no,
-Cobb angle,measure,should,yes,no,
-Rectangle ROI,measure,should,yes,no,
+Cobb angle,measure,should,yes,partial,built; not checked
+Rectangle ROI,measure,should,yes,partial,built; not checked
 Open and closed polygon,measure,should,yes,no,
 Arrow and freehand pen,annotate,should,yes,no,
 Length ratio and deviation tools,measure,should,yes,no,
 Custom window presets,2D,should,yes,no,
 Image filters (sharpen smooth edge emboss),2D,should,yes,no,
-Sort by instance/position/time/file name,browse,should,yes,no,
-Hide patient data mode,privacy,should,yes,no,
+Sort by instance/position/time/file name,browse,should,yes,partial,sorted by position along the slice normal with fallbacks; no user choice yet
+Hide patient data mode,privacy,should,yes,yes,in the copy-image menu
 Full screen and distraction-free mode,2D,should,yes,no,
 Restore view state when switching series,2D,should,yes,no,
 PACS C-ECHO/C-FIND/C-MOVE SCU,pacs,should,yes,no,F05
@@ -68,7 +68,7 @@ Ellipsoid volume,measure,could,yes,no,
 3D scalpel with undo/redo,3D,could,yes,no,
 3D snapshots and movie creator,3D,could,yes,no,
 STL export,3D,could,yes,no,
-GPU acceleration,3D,could,yes,no,original NVIDIA-only; clone could use WebGL/Vulkan for any GPU
+GPU acceleration,3D,could,yes,partial,the 2D view already renders on the GPU through WebGL
 Anonymization with templates,privacy,could,yes,no,add-on in original
 SR / encapsulated PDF / DICOM video viewing,open,could,yes,no,
 Interface translations (30+),i18n,could,yes,no,write fresh; the original's community translations are not reusable

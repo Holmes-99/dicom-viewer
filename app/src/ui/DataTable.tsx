@@ -5,10 +5,10 @@ import { Button, cx } from './controls'
 export type Column<T> = { key: keyof T & string; label: string; width?: number; mono?: boolean; render?: (row: T) => ReactNode }
 
 export function DataTable<T extends { id: string | number }>({
-  columns, rows, state = 'ready', emptyText, emptyAction, filter, onRetry, label,
+  columns, rows, state = 'ready', emptyText, emptyAction, filter, onRetry, label, onRowActivate,
 }: {
   columns: Column<T>[]; rows: T[]; state?: 'ready' | 'loading' | 'error'; emptyText: string; emptyAction?: ReactNode
-  filter?: string; onRetry?: () => void; label: string
+  filter?: string; onRetry?: () => void; label: string; onRowActivate?: (row: T) => void
 }) {
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null)
   const [sel, setSel] = useState<Set<T['id']>>(new Set())
@@ -79,8 +79,16 @@ export function DataTable<T extends { id: string | number }>({
             <tr
               key={row.id}
               aria-selected={sel.has(row.id)}
+              tabIndex={0}
               onClick={(e) => click(i, e)}
-              className={cx('h-6 cursor-default', sel.has(row.id) ? 'bg-accent-strong/35' : 'hover:bg-surface-hover')}
+              onDoubleClick={() => onRowActivate?.(row)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onRowActivate?.(row)
+                if (e.key === 'ArrowDown') { e.preventDefault(); (e.currentTarget.nextElementSibling as HTMLElement | null)?.focus() }
+                if (e.key === 'ArrowUp') { e.preventDefault(); (e.currentTarget.previousElementSibling as HTMLElement | null)?.focus() }
+              }}
+              onFocus={() => { if (!sel.has(row.id)) { setSel(new Set([row.id])); setAnchor(i) } }}
+              className={cx('h-6 cursor-default outline-offset-[-2px]', sel.has(row.id) ? 'bg-accent-strong/35' : 'hover:bg-surface-hover')}
             >
               {columns.map((c) => (
                 <td key={c.key} className={cx('truncate px-2', c.mono && 'font-mono text-xs tabular-nums')}>
