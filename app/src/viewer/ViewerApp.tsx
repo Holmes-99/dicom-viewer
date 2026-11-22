@@ -162,7 +162,7 @@ export default function ViewerApp() {
       })
     }
     // let newly enabled panels mount first
-    const t = setTimeout(() => setSyncedViewports(ids.length > 1 ? ids : []), 0)
+    const t = setTimeout(() => setSyncedViewports(vpId(active), ids.length > 1 ? ids : []), 0)
     return () => clearTimeout(t)
   }, [engineReady, sync, session, active, visibleKey, count]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -173,11 +173,13 @@ export default function ViewerApp() {
   // ------------------------------------------------------------ tags, export, calibrate
   const openTags = () => {
     const v = stackViewport(activeId)
-    const imageId = v?.getCurrentImageId()
     const se = findSeries(session, panels[active])
+    // right after a series is shown the panel may not have its stack yet: fall back to the series' first image
+    const index = v?.getImageIds().length ? v.getCurrentImageIdIndex() : 0
+    const imageId = (v?.getImageIds().length ? v.getCurrentImageId() : undefined) ?? se?.imageIds[index]
     setTags({
       header: imageId ? (source.getHeader(imageId) as DataSet | undefined) ?? null : null,
-      title: se ? `${se.description || se.modality} · image ${(v?.getCurrentImageIdIndex() ?? 0) + 1}` : '',
+      title: se ? `${se.description || se.modality} · image ${index + 1}` : '',
     })
   }
   const activeSeries = findSeries(session, panels[active])
@@ -272,9 +274,9 @@ export default function ViewerApp() {
         onDragLeave={(e) => { if (e.currentTarget === e.target) setDropping(false) }}
         onDrop={async (e) => { if (!e.dataTransfer.types.includes('Files')) return; e.preventDefault(); setDropping(false); openFiles(await filesFromDrop(e.dataTransfer)) }}
       >
-        <input ref={fileInput} type="file" multiple hidden onChange={(e) => { openFiles(e.target.files); e.target.value = '' }} />
-        <input ref={folderInput} type="file" multiple hidden {...{ webkitdirectory: '' }} onChange={(e) => { openFiles(e.target.files); e.target.value = '' }} />
-        <input ref={zipInput} type="file" accept=".zip,application/zip" multiple hidden onChange={(e) => { openFiles(e.target.files); e.target.value = '' }} />
+        <input ref={fileInput} aria-label="Choose files to open" type="file" multiple hidden onChange={(e) => { openFiles(e.target.files); e.target.value = '' }} />
+        <input ref={folderInput} aria-label="Choose a folder to open" type="file" multiple hidden {...{ webkitdirectory: '' }} onChange={(e) => { openFiles(e.target.files); e.target.value = '' }} />
+        <input ref={zipInput} aria-label="Choose ZIP archives to open" type="file" accept=".zip,application/zip" multiple hidden onChange={(e) => { openFiles(e.target.files); e.target.value = '' }} />
 
         <Toolbar>
           <ToolButton icon={<FolderOpen size={I} />} label="Open folder" shortcut="Ctrl+O" onClick={() => folderInput.current?.click()} menu={openMenu} />

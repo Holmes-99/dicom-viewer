@@ -3,7 +3,7 @@ import { init as loaderInit } from '@cornerstonejs/dicom-image-loader'
 import {
   init as toolsInit, addTool, ToolGroupManager, Enums as ToolEnums, annotation,
   WindowLevelTool, PanTool, ZoomTool, StackScrollTool, LengthTool, AngleTool, CobbAngleTool,
-  EllipticalROITool, RectangleROITool, PlanarRotateTool, ReferenceLinesTool, SynchronizerManager, synchronizers,
+  EllipticalROITool, RectangleROITool, PlanarRotateTool, ReferenceLinesTool,
 } from '@cornerstonejs/tools'
 
 export const ENGINE_ID = 'main'
@@ -62,7 +62,6 @@ export function initEngine() {
     const tg = ToolGroupManager.createToolGroup(TOOLGROUP_ID)!
     for (const name of Object.values(toolNames)) tg.addTool(name)
     tg.addTool(ReferenceLinesTool.toolName)
-    synchronizers.createImageSliceSynchronizer(SLICE_SYNC_ID)
     setActiveTool('wl')
   })()
   return ready
@@ -88,22 +87,45 @@ export function setActiveTool(id: ToolId) {
 }
 
 // ------------------------------------------------------------ sync + reference lines
-const SLICE_SYNC_ID = 'slice-sync'
-
 /**
  * Auto sync: panels showing series in the same frame of reference follow each other's slice position.
- * Pass the viewport ids that should take part; an empty list switches sync off.
+ * The panel being used (`sourceId`) drives the others in `ids`; an empty list switches sync off.
+ *
+ * Our own listener rather than the renderer's image-slice synchronizer: in 5.19 that callback takes these
+ * stack panels for volume slices and mirrors the target index (image 13 of 80 → image 66), and as a
+ * two-way sync its late echoes pulled the panel being scrolled back and forth.
  */
-export function setSyncedViewports(ids: string[]) {
-  const sync = SynchronizerManager.getSynchronizer(SLICE_SYNC_ID)
-  if (!sync) return
-  const re = engine()
-  if (!re) return
-  const want = new Set(ids)
-  for (const v of sync.getSourceViewports()) if (!want.has(v.viewportId)) sync.remove({ renderingEngineId: re.id, viewportId: v.viewportId })
-  const have = new Set(sync.getSourceViewports().map((v) => v.viewportId))
-  for (const id of ids) if (!have.has(id) && re.getViewport(id)) sync.add({ renderingEngineId: re.id, viewportId: id })
+let unsync: (() => void) | null = null
+export function setSyncedViewports(sourceId: string | null, ids: string[]) {
+  unsync?.()
+  unsync = null
+  const src = sourceId ? stackViewport(sourceId) : undefined
+  const targets = ids.filter((id) => id !== sourceId)
+  if (!src || !targets.length) return
+  const follow = () => {
+    const pos = plane(src.getCurrentImageId())?.imagePositionPatient
+    if (!pos) return
+    for (const id of targets) {
+      const t = stackViewport(id)
+      const list = t?.getImageIds() ?? []
+      if (!t || !list.length) continue
+      let best = -1, bestD = Infinity
+      list.forEach((imageId, i) => {
+        const p = plane(imageId)?.imagePositionPatient
+        if (!p) return
+        const d = (p[0] - pos[0]) ** 2 + (p[1] - pos[1]) ** 2 + (p[2] - pos[2]) ** 2
+        if (d < bestD) { bestD = d; best = i }
+      })
+      if (best >= 0 && best !== t.getCurrentImageIdIndex()) t.setImageIdIndex(best).catch(() => {})
+    }
+  }
+  const el = src.element
+  el.addEventListener(Enums.Events.STACK_NEW_IMAGE, follow)
+  follow()
+  unsync = () => el.removeEventListener(Enums.Events.STACK_NEW_IMAGE, follow)
 }
+const plane = (imageId: string | undefined) =>
+  imageId ? (metaData.get('imagePlaneModule', imageId) as { imagePositionPatient?: number[] } | undefined) : undefined
 
 /** Draws the active panel's plane as a line on every other panel that cuts it (null switches them off). */
 export function setReferenceSource(viewportId: string | null) {

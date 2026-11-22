@@ -94,6 +94,8 @@ export function StackPanel({
     <div
       className={cx('relative h-full w-full min-h-0 min-w-0 overflow-hidden bg-viewport outline-1 -outline-offset-1', active ? 'outline outline-accent' : 'outline-transparent', dragOver && 'outline-2 outline-dashed outline-accent')}
       onMouseDownCapture={onActivate}
+      // scrolling a panel with the wheel makes it the one the others follow
+      onWheelCapture={active ? undefined : onActivate}
       onFocus={onActivate}
       onDragOver={(e) => { if (e.dataTransfer.types.includes('application/x-series')) { e.preventDefault(); setDragOver(true) } }}
       onDragLeave={() => setDragOver(false)}
