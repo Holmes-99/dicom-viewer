@@ -1,5 +1,5 @@
 feature,area,priority,original,clone,notes
-Open DICOM files and folders,open,must,yes,yes,F01; folder and file pickers (Ctrl+O / Ctrl+Shift+O); browser data layer until the Tauri core exists
+Open DICOM files and folders,open,must,yes,yes,F01; folder and file pickers (Ctrl+O / Ctrl+Shift+O); browser data layer until the Electron shell exists (D1)
 Open CD/DVD/USB with or without DICOMDIR,open,must,yes,partial,a disc opens as a folder (every file is scanned); DICOMDIR is skipped rather than used to speed up
 Open ZIP including AES password ZIP,open,must,yes,yes,Open menu or drop; plain and AES ZIPs checked; wrong password asks again; cancel stops cleanly
 Drag and drop files onto window,open,must,yes,yes,files and whole folders
@@ -75,5 +75,9 @@ Interface translations (30+),i18n,could,yes,no,write fresh; the original's commu
 Settings screen (original uses options.xml),settings,could,partial,no,improvement over original
 Command line and radiant:// URL protocol,integration,could,yes,skip,their protocol name and CLI are theirs; design your own
 Licensing / trial / activation,license,could,yes,skip,clone is free
-CD/DVD autorun edition with custom logo,distribution,could,yes,skip,paid separate product; maybe a portable build later
+CD/DVD autorun edition with custom logo,distribution,must,yes,no,ground rule 5: Export > Prepare disc folder (study + DICOMDIR + portable viewer); milestone D3
+Desktop app: Windows installer (per-user; .dcm and DICOMDIR associated),distribution,must,yes,no,ground rule 1; Electron + electron-builder NSIS; milestone D1-D2
+Portable Windows version (no install),distribution,must,yes,no,ground rule 5; milestone D2
+Mac app (.dmg; Apple Silicon + Intel),distribution,must,yes,no,ground rule 1; milestone D2
+Fully offline: no internet connection ever (enforced and tested),privacy,must,partial,no,ground rule 6; the original checks for updates online; milestone D1
 Community translations and branding,brand,could,yes,skip,owned by the vendor and its community
