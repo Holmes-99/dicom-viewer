@@ -1,0 +1,54 @@
+# Builds the desktop app on GitHub's machines: the Windows installer + portable exe, and the Mac dmg
+# (a dmg can only be made on a Mac). Runs only when started by hand (Actions → Build → Run workflow)
+# or when a version tag like v0.1.0 is pushed. The files appear under the run's "Artifacts".
+# Nothing is published or uploaded anywhere else.
+name: Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist
+            files: |
+              app/release/*.exe
+          - os: macos-latest
+            script: dist:mac
+            files: |
+              app/release/*.dmg
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: node node_modules/electron/install.js
+      # synthetic demo study (no patient data); it ships inside the app for "Try the demo study"
+      - run: npm run demo
+      - run: npm run ${{ matrix.script }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # unsigned until a signing decision is made
+      # the desktop checks (offline lock, opening files) against the program just built
+      - run: npx playwright install chromium
+      - run: npm run test:packaged
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-build
+          path: ${{ matrix.files }}
+          if-no-files-found: error
