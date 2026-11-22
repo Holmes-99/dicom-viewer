@@ -95,3 +95,5 @@ Status: fixed in 39d161b
 - A real, multi-MB BMP download in desktop Chrome and Edge. The automated browser cannot do it (see above). Checked by hand: not yet.
 - Cine at 30 fps in a visible window (F02-E4). The test browser throttles frames, so speed is not measured.
 - Drag a folder from Explorer (F01-H4) and whole-series export to a folder (F11-E2). Both need the OS file dialog or drag source and are not automated.
+- F03-H1 (length in mm) failed once in a full run on 2026-11-23: the label read under 130 mm. It then passed 3 times in a row on its own. Probably the drag landing before the panel finished fitting under load. Watch for it again.
+- Inside the desktop window: save dialogs for export, copy to clipboard and the series-to-folder picker. The browser versions are tested; the Electron ones only by the D1 checks that load and open.

@@ -1,6 +1,6 @@
 # Build log
 
-Run the viewer with `npm run dev` in `app/`, then open http://localhost:5173 (the design system page is at `#/design`).
+Run the desktop app with `npm run desktop` in `app/` (builds, then opens the window). `npm run app` opens it without rebuilding. `npm run dev` still runs it in a browser at http://localhost:5173 for development and the browser tests (the design system page is at `#/design`).
 Demo data: `npm run demo` (in `app/`) writes a synthetic CT study (no patient data) to `app/public/demo/`. It is not committed.
 
 | screen | date | status | missing | harder than expected |
@@ -14,6 +14,7 @@ Demo data: `npm run demo` (in `app/`) writes a synthetic CT study (no patient da
 | S12 DICOM tags | 2026-11-22 | done | pin/colour tags, save a raw value to a file | Tag names come from a hand-written list of about 90 common tags; any other tag shows its number. A full dictionary can come later. |
 | S13 export | 2026-11-22 | partial | MP4/video, DICOM, STL (all "should"); overlay text is not burned into the image | The browser has no BMP encoder, so we write BMP ourselves. A whole series goes into a folder you pick (the File System Access API, available in WebView2). |
 | F01 ZIP open | 2026-11-22 | done | — | zip.js handles AES; a wrong password asks again. |
+| D1 desktop shell | 2026-11-23 | done | the 41 browser tests are not yet re-run inside the Electron window; "Open disc" drive list; DICOMDIR use; real 2000-slice CT memory test | Electron 45 no longer downloads its program on `npm install` (run `node node_modules/electron/install.js`). Chromium rewrites the command line it passes to the already-open window, so a second launch sends its file paths as data instead. |
 
 ## Vertical slice: what was checked in the browser (1440×900)
 
@@ -50,14 +51,22 @@ The demo study now also has a coronal series (series 5, 48 slices, same frame of
 - The toolbar scrolls sideways when it doesn't fit (at 1024 px it was 22 px too wide). **VERIFY** how the original handles a narrow window.
 - Shortcuts to check against the original: C for cine, F2 for tags, Ctrl+S for export. Also check whether auto sync starts on.
 
+## D1 desktop shell: what was built and checked (2026-11-23)
+
+- `app/electron/main.cjs` opens one window on `app://viewer/`, serving the built files from `dist/`. The viewer code is unchanged.
+- **Offline lock:**
+  - every request other than `app:`, `blob:` and `data:` is cancelled
+  - a content policy limits what the page may load
+  - leaving the page and opening new windows are refused
+  - Chromium's background traffic is switched off
+  - the spell-check dictionary download is switched off
+- **The page has no Node:** sandbox on, context isolation on. It only gets `window.viewer` (`electron/preload.cjs`).
+- **Files from outside** (command line, double-click later, a second launch) are listed by the main process and given random tokens. The page fetches their bytes from `app://viewer/@file/{token}` and opens them with the same data layer. Any other path or token gets 404.
+- **Single instance:** a second launch hands its files to the open window and exits.
+- **Checks:** `npm run test:desktop` (5 checks, `e2e-desktop/d01-shell.spec.ts`), after `npm run build`. All 5 pass: loads with no Node; network, `file://`, websockets and navigation blocked; demo opens; folder on the command line opens; second launch hands over.
+
 ## Next
 
-Must-haves: **20 of 30 done, 10 partial, 0 missing.**
-
-1. Close the partials:
-   - Codec test files (public pydicom/GDCM test data) for JPEG, JPEG-LS, J2K, HTJ2K, RLE, big endian, multi-frame and US colour.
-   - Use DICOMDIR on discs.
-   - Measure the cine frame rate in a visible window.
-   - Check the angle tool and copy to clipboard.
-2. `/replica-test`: Playwright end-to-end tests for F01–F04 and F11, plus the reference screenshots.
-3. Install Rust and add the Tauri shell (`tauriSource` implementing the same `DataSource` interface).
+1. D2 packaging: `npm run dist` builds the installer (with file association), portable exe and Mac dmg.
+2. D3 patient CD folder.
+3. The partial must-haves (DICOMDIR use, codec files, fuzz suite, cine fps).

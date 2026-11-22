@@ -76,8 +76,8 @@ Settings screen (original uses options.xml),settings,could,partial,no,improvemen
 Command line and radiant:// URL protocol,integration,could,yes,skip,their protocol name and CLI are theirs; design your own
 Licensing / trial / activation,license,could,yes,skip,clone is free
 CD/DVD autorun edition with custom logo,distribution,must,yes,no,ground rule 5: Export > Prepare disc folder (study + DICOMDIR + portable viewer); milestone D3
-Desktop app: Windows installer (per-user; .dcm and DICOMDIR associated),distribution,must,yes,no,ground rule 1; Electron + electron-builder NSIS; milestone D1-D2
+Desktop app: Windows installer (per-user; .dcm and DICOMDIR associated),distribution,must,yes,partial,D1 done: Electron window; files from the command line and a second launch open in the running window (e2e-desktop D01-H4/H5); installer and file association are D2
 Portable Windows version (no install),distribution,must,yes,no,ground rule 5; milestone D2
 Mac app (.dmg; Apple Silicon + Intel),distribution,must,yes,no,ground rule 1; milestone D2
-Fully offline: no internet connection ever (enforced and tested),privacy,must,partial,no,ground rule 6; the original checks for updates online; milestone D1
+Fully offline: no internet connection ever (enforced and tested),privacy,must,partial,yes,ground rule 6; D1: app:// only + content policy + every http/https/ws request cancelled + navigation blocked; e2e-desktop D01-H2
 Community translations and branding,brand,could,yes,skip,owned by the vendor and its community
