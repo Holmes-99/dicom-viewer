@@ -10,6 +10,12 @@ Run it with `npx playwright test` in `app/`. Every spec fails on any console err
 
 `auto` = Playwright spec · `manual` = checked by hand in the browser pane · result filled after the run.
 
+## Results (2026-11-22)
+
+- Run 1: 41 automated tests, 34 passed, 7 failed. 4 failures were real bugs (BUG-001 to 004, see `bugs.md`); 3 were mistakes in the tests.
+- Run 2, after the fixes: **41 / 41 pass**. Every `e2e` case below passes.
+- `manual` cases (F01-H4 folder drag, F02-E4 real frame rate, F11-E2 series export to a folder): **not run yet**.
+
 ## F01 Open a study and read it
 
 | case | type | steps | expected | auto | result |
