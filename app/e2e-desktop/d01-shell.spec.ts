@@ -6,13 +6,16 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 // D1: the desktop shell. Needs `npm run build` first (the shell loads dist/).
+// With VIEWER_EXE set (D2), the same checks run against the packaged program instead.
 const APP = resolve(import.meta.dirname, '..')
 const DEMO = join(APP, 'dist', 'demo')
-const ELECTRON = createRequire(import.meta.url)('electron') as string
+const EXE = process.env.VIEWER_EXE
+const ELECTRON = EXE ?? (createRequire(import.meta.url)('electron') as string)
+const base = EXE ? [] : [APP]
 
 async function launch(args: string[] = []) {
   const userData = mkdtempSync(join(tmpdir(), 'viewer-test-'))
-  const app = await electron.launch({ args: [APP, ...args], env: { ...process.env, VIEWER_USER_DATA: userData } })
+  const app = await electron.launch({ executablePath: EXE, args: [...base, ...args], env: { ...process.env, VIEWER_USER_DATA: userData } })
   const page = await app.firstWindow()
   const problems: string[] = []
   page.on('console', (m) => { if (m.type() === 'error') problems.push(m.text()) })
@@ -97,7 +100,7 @@ test('D01-H5 a second launch hands its files to the open window and quits', asyn
   running = app
   await acceptNotice(page)
   await expect(page.getByRole('heading', { name: 'Open a study' })).toBeVisible()
-  const second = spawn(ELECTRON, [APP, join(DEMO, 's2_001.dcm')], { env: { ...process.env, VIEWER_USER_DATA: userData } })
+  const second = spawn(ELECTRON, [...base, join(DEMO, 's2_001.dcm')], { env: { ...process.env, VIEWER_USER_DATA: userData } })
   const code = await new Promise<number | null>((res) => second.on('exit', res))
   expect(code).toBe(0)
   await expect(firstPanel(page)).toHaveAccessibleName(/image 1 of 1$/, { timeout: 30_000 })
