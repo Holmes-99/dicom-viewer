@@ -1,9 +1,12 @@
 import dicomParser, { type DataSet } from 'dicom-parser'
 import type { Instance, Patient, Series, Session, Study } from './types'
+import { text } from './charset'
 
 export type Parsed = { file: File; imageId: string; ds: DataSet }
 
 const str = (ds: DataSet, tag: string) => (ds.string(tag) ?? '').trim()
+/** names and descriptions: decoded with the file's character set */
+const txt = (ds: DataSet, tag: string) => text(ds, tag).trim()
 const nums = (ds: DataSet, tag: string) => {
   const s = ds.string(tag)
   if (!s) return null
@@ -35,23 +38,23 @@ export function buildSession(parsed: Parsed[], skipped: Session['skipped']): Ses
   for (const { ds, imageId, file } of parsed) {
     const studyUid = str(ds, 'x0020000d') || 'unknown-study'
     const seriesUid = str(ds, 'x0020000e') || `unknown-series-${studyUid}`
-    const pKey = [str(ds, 'x00100020'), str(ds, 'x00100010'), str(ds, 'x00100030')].join('|')
+    const pKey = [txt(ds, 'x00100020'), txt(ds, 'x00100010'), str(ds, 'x00100030')].join('|')
 
     let p = patients.get(pKey)
     if (!p) {
-      p = { key: pKey, name: str(ds, 'x00100010'), id: str(ds, 'x00100020'), birthDate: str(ds, 'x00100030'), sex: str(ds, 'x00100040'), studies: [] }
+      p = { key: pKey, name: txt(ds, 'x00100010'), id: txt(ds, 'x00100020'), birthDate: str(ds, 'x00100030'), sex: str(ds, 'x00100040'), studies: [] }
       patients.set(pKey, p)
     }
     let st = studies.get(studyUid)
     if (!st) {
-      st = { studyUid, date: str(ds, 'x00080020'), time: str(ds, 'x00080030'), description: str(ds, 'x00081030'), accession: str(ds, 'x00080050'), modalities: [], series: [] }
+      st = { studyUid, date: str(ds, 'x00080020'), time: str(ds, 'x00080030'), description: txt(ds, 'x00081030'), accession: txt(ds, 'x00080050'), modalities: [], series: [] }
       studies.set(studyUid, st)
       p.studies.push(st)
     }
     let se = series.get(seriesUid)
     if (!se) {
       se = {
-        seriesUid, studyUid, modality: str(ds, 'x00080060'), number: int(ds, 'x00200011'), description: str(ds, 'x0008103e'),
+        seriesUid, studyUid, modality: str(ds, 'x00080060'), number: int(ds, 'x00200011'), description: txt(ds, 'x0008103e'),
         frameOfReference: str(ds, 'x00200052') || null, rows: ds.uint16('x00280010') ?? null, cols: ds.uint16('x00280011') ?? null,
         instances: [], imageIds: [],
       }

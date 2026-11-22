@@ -4,6 +4,7 @@ import { Button } from '../ui/controls'
 import { Dialog, DialogClose } from '../ui/overlays'
 import { DataTable, type Column } from '../ui/DataTable'
 import { TAG_NAMES, TRANSFER_SYNTAXES } from '../data/tag-names'
+import { CHARSET_VRS, text } from '../data/charset'
 
 // S12: every tag of the image shown in the selected panel. Search filters; Enter or double-click copies the value.
 
@@ -32,7 +33,7 @@ function value(ds: DataSet, el: Element, vr: string): string {
     case 'AT': return n(4, (i) => { const g = ds.uint16(tag, i * 2), e = ds.uint16(tag, i * 2 + 1); return g === undefined ? undefined : `(${hex(g)},${hex(e ?? 0)})` })
   }
   if (TEXT_VRS.has(vr) || (!vr && el.length < 256)) {
-    const s = ds.string(tag) ?? ''
+    const s = CHARSET_VRS.has(vr) ? text(ds, tag) : ds.string(tag) ?? ''
     // implicit VR files give no VR: show the text only if it looks like text
     if (!vr && /[^\x20-\x7e -￿]/.test(s)) return `${el.length} bytes`
     const shown = s.length > MAX_VALUE ? s.slice(0, MAX_VALUE) + '…' : s
