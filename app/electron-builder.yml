@@ -1,0 +1,57 @@
+# D2 packaging: `npm run dist` (Windows: installer + portable) and `npm run dist:mac` (on a Mac: universal dmg).
+# Name, app id and icons are placeholders until /replica-brand picks the real ones.
+appId: org.holmes99.dicomviewer
+productName: DICOM Viewer
+copyright: Free software. Not a medical device.
+directories:
+  output: release
+  buildResources: build
+# the viewer is already bundled by Vite into dist/; the shell needs only Electron and Node
+files:
+  - dist/**/*
+  - electron/**/*
+  - package.json
+asar: true
+electronLanguages: [en-US]
+fileAssociations:
+  - ext: dcm
+    name: DICOM image
+    description: DICOM medical image
+    role: Viewer
+    mimeType: application/dicom
+  - ext: dicom
+    name: DICOM image
+    role: Viewer
+    mimeType: application/dicom
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  # unsigned until Holmes-99 decides on a code-signing certificate (deploy.md)
+  signAndEditExecutable: true
+nsis:
+  oneClick: true
+  perMachine: false          # per user: no admin rights needed
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  deleteAppDataOnUninstall: true
+  differentialPackage: false # that is for auto-updates, which this app never does
+  artifactName: ${productName}-Setup-${version}.${ext}
+portable:
+  artifactName: ${productName}-Portable-${version}.${ext}
+
+mac:
+  target:
+    - target: dmg
+      arch: [universal]
+  category: public.app-category.medical
+  # unsigned until Holmes-99 decides on an Apple Developer account (deploy.md)
+  identity: null
+dmg:
+  artifactName: ${productName}-${version}.${ext}
+
+# fully offline: no update feed, no publishing from the build
+publish: null

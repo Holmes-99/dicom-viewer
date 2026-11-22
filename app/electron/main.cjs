@@ -20,8 +20,22 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } },
 ])
 
-// tests run each launch with its own settings folder
-if (process.env.VIEWER_USER_DATA) app.setPath('userData', process.env.VIEWER_USER_DATA)
+// Settings folder. Tests give each launch its own. The portable build keeps settings next to the exe when that
+// folder is writable (a USB stick), otherwise in the temp folder, so a hospital PC is left untouched.
+function portableDataDir() {
+  const dir = process.env.PORTABLE_EXECUTABLE_DIR
+  if (!dir) return null
+  const next = path.join(dir, 'DICOM Viewer data')
+  try {
+    fs.mkdirSync(next, { recursive: true })
+    fs.accessSync(next, fs.constants.W_OK)
+    return next
+  } catch {
+    return path.join(app.getPath('temp'), 'DICOM Viewer data')
+  }
+}
+const dataDir = process.env.VIEWER_USER_DATA || portableDataDir()
+if (dataDir) app.setPath('userData', dataDir)
 
 // ------------------------------------------------------------ single instance: a second launch hands its files over
 // Chromium rewrites the command line it hands to the first instance, so the paths travel resolved, as data.
