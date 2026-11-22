@@ -15,7 +15,7 @@ Agreed with Holmes-99 on 2026-11-22. These come before every other plan in `repl
 6. **Fully offline.** The app never connects to the internet: no update checks, telemetry, crash reports, fonts or CDN files. This is enforced in code (the offline lock in `architecture.md`) and checked by a test.
 7. **Images stay on the computer.** Opened files are only read, never changed, moved or uploaded. Temporary copies are deleted when the app closes.
 8. **No real patient data in development.** Use the synthetic demo study, the generated test files and public de-identified sample sets. Never use real patient files in tests, screenshots or commits.
-9. **Open decision: PACS.** Should the app talk to a hospital's own image server over the local network, as RadiAnt can? It would be off by default and never reach the internet. Until Holmes-99 decides, PACS is not built.
+9. **No PACS for now** (decided 2026-11-22). PACS is a hospital's central image server. RadiAnt can download studies from one over the hospital network. Our app opens files, folders, ZIPs and CDs only. PACS can come back later if a hospital asks for it, and even then it would never reach the internet.
 
 ## Clean room
 

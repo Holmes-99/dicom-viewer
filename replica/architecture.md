@@ -27,7 +27,7 @@ The default web stack from this skill (Next.js, Postgres, Stripe, auth, hosting)
 | file access | Electron main process (Node `fs`) through a narrow preload bridge | The renderer never gets Node. It can only call the bridge functions listed under API. |
 | ZIP | @zip.js/zip.js (AES) | Already built. |
 | local archive (later) | `node:sqlite` (built into Node 22+, inside Electron) | No native module to rebuild for each platform. Schema in `schema.sql`. |
-| PACS (later, see open decision) | dcmjs-dimse (pure JS) in the main process | C-ECHO/FIND/MOVE/GET/STORE without native code. |
+| PACS | **not built** (decided 2026-11-22) | If ever added: dcmjs-dimse (pure JS) in the main process, local network only. |
 | packaging | **electron-builder** | NSIS per-user installer (no admin rights), portable `.exe`, Mac `.dmg` (Apple Silicon + Intel), and the disc build. |
 | updates | **none built in** | Fully offline: new versions are a new installer from the GitHub releases page. There is no auto-updater and the app never checks. |
 | telemetry, crash reports | **none** | Patient data. Nothing leaves the computer. |
@@ -91,9 +91,9 @@ The renderer sees one object, `window.viewer`. Each call goes to an IPC handler 
 3. **D2, packaging.** NSIS installer, portable exe and Mac dmg from one command (`npm run dist`). Smoke-test each on a clean Windows PC and a Mac.
 4. **D3, patient CD.** Export → Prepare disc folder…, DICOMDIR writer, portable viewer copied in, the disc opens straight to the study.
 5. **The 10 partial must-haves** (DICOMDIR use, remaining codecs, the fuzz suite…).
-6. **Should-haves.** Local archive, MPR/MIP, volume rendering, more tools, print, MP4/DICOM export. PACS too, if the open decision below says yes.
+6. **Should-haves.** Local archive, MPR/MIP, volume rendering, more tools, print, MP4/DICOM export. No PACS (see below).
 7. **Could-haves**, then fixes from `/replica-entrepreneur`.
 
-## Open decision
+## Decided: no PACS for now
 
-- **PACS (hospital image server).** RadiAnt can search a PACS and pull studies over the hospital's own network (6 should-have features). "Never use the network" rules this out. Either drop PACS entirely, or allow exactly one exception: local-network PACS connections that the user sets up by hand, off by default, never to the internet. Waiting on Holmes-99.
+PACS is a hospital's central image server. RadiAnt can search one and download studies over the hospital network (6 should-have features). Holmes-99's users open files, folders and CDs, and the app is fully offline, so PACS is **left out** (2026-11-22). The bridge has room for a `pacs.*` group later. If it is ever added, it is local network only, off by default, and set up by hand.

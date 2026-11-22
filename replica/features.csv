@@ -43,12 +43,12 @@ Sort by instance/position/time/file name,browse,should,yes,partial,sorted by pos
 Hide patient data mode,privacy,should,yes,yes,in the copy-image menu
 Full screen and distraction-free mode,2D,should,yes,no,
 Restore view state when switching series,2D,should,yes,no,
-PACS C-ECHO/C-FIND/C-MOVE SCU,pacs,should,yes,no,F05
-PACS C-GET,pacs,should,yes,no,
-PACS C-STORE SCP listener with IP filter,pacs,should,yes,no,
-Series-level PACS search and download,pacs,should,yes,no,
-PACS search presets,pacs,should,yes,no,
-Send to PACS (C-STORE SCU),pacs,should,yes,no,add-on in original
+PACS C-ECHO/C-FIND/C-MOVE SCU,pacs,should,yes,skip,not built: ground rule 9 (no PACS for now); F05
+PACS C-GET,pacs,should,yes,skip,not built: ground rule 9 (no PACS for now); 
+PACS C-STORE SCP listener with IP filter,pacs,should,yes,skip,not built: ground rule 9 (no PACS for now); 
+Series-level PACS search and download,pacs,should,yes,skip,not built: ground rule 9 (no PACS for now); 
+PACS search presets,pacs,should,yes,skip,not built: ground rule 9 (no PACS for now); 
+Send to PACS (C-STORE SCU),pacs,should,yes,skip,not built: ground rule 9 (no PACS for now); add-on in original
 Local archive database with import,archive,should,yes,no,F06
 Keyword tagging and OR search,archive,should,yes,no,
 Multiple archives and export between them,archive,should,yes,no,
