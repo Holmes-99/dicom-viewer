@@ -14,8 +14,11 @@ function download(blob: Blob, name: string) {
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
   a.download = name
+  document.body.append(a)
   a.click()
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  a.remove()
+  // a big BMP can take a while to hand over; revoking too early cancels the download
+  setTimeout(() => URL.revokeObjectURL(a.href), 60_000)
 }
 
 // Dialogs below start fresh each time they open: the caller remounts them with a new `key`.
