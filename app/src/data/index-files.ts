@@ -3,6 +3,7 @@ import type { Instance, Patient, Series, Session, Study } from './types'
 import { text } from './charset'
 
 export type Parsed = { file: File; imageId: string; ds: DataSet }
+const MAX_FRAMES = 20_000
 
 const str = (ds: DataSet, tag: string) => (ds.string(tag) ?? '').trim()
 /** names and descriptions: decoded with the file's character set */
@@ -22,7 +23,46 @@ const int = (ds: DataSet, tag: string) => {
 export async function parseHeader(file: File): Promise<DataSet> {
   const buf = new Uint8Array(await file.arrayBuffer())
   // untilTag stops before pixel data: headers only, cheap and safer.
-  return dicomParser.parseDicom(buf, { untilTag: 'x7fe00010' })
+  const ds = dicomParser.parseDicom(buf, { untilTag: 'x7fe00010' })
+  checkBounds(ds, buf.length)
+  return ds
+}
+
+/** The parser reads values lazily; an element whose length runs past the end of the file would throw later. */
+function checkBounds(ds: DataSet, size: number, depth = 0) {
+  if (depth > 16) throw new Error('sequences nested too deep')
+  for (const el of Object.values(ds.elements)) {
+    if (el.tag === 'x7fe00010') continue
+    if (el.length !== 0xffffffff && (el.length < 0 || el.dataOffset + el.length > size)) throw new Error(`${el.tag} runs past the end of the file`)
+    for (const item of el.items ?? []) if (item.dataSet) checkBounds(item.dataSet, size, depth + 1)
+  }
+}
+
+const DEFLATED = '1.2.840.10008.1.2.1.99'
+const EXPLICIT_LE = '1.2.840.10008.1.2.1'
+
+/**
+ * Deflated files (rare; some PACS exports) are unpacked once on open into plain explicit little endian, so the
+ * header reader, the image loader and the disc export all see an ordinary file. Anything else is returned as is.
+ */
+export async function inflateIfNeeded(file: File): Promise<File> {
+  const head = new Uint8Array(await file.slice(0, Math.min(file.size, 4096)).arrayBuffer())
+  if (head.length < 144 || String.fromCharCode(...head.subarray(128, 132)) !== 'DICM') return file
+  let meta: DataSet
+  try { meta = dicomParser.readPart10Header(head) } catch { return file }
+  if (str(meta, 'x00020010') !== DEFLATED) return file
+  const ts = meta.elements.x00020010, group = meta.elements.x00020000
+  if (!ts || !group) return file
+  const metaEnd = group.dataOffset + 4 + meta.uint32('x00020000')!
+  const all = new Uint8Array(await file.arrayBuffer())
+  const body = new Uint8Array(await new Response(new Blob([all.subarray(metaEnd)]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer())
+  // the same meta header with the new transfer syntax (20 bytes instead of 22) and its group length fixed
+  const uid = new TextEncoder().encode(EXPLICIT_LE + '\0')
+  const before = all.slice(0, ts.dataOffset), after = all.slice(ts.dataOffset + ts.length, metaEnd)
+  const dv = new DataView(before.buffer)
+  dv.setUint16(ts.dataOffset - 2, uid.length, true)
+  dv.setUint32(group.dataOffset, meta.uint32('x00020000')! - ts.length + uid.length, true)
+  return new File([before, uid, after, body], file.name, { type: file.type, lastModified: file.lastModified })
 }
 
 export function isDicomDir(ds: DataSet) {
@@ -36,42 +76,49 @@ export function buildSession(parsed: Parsed[], skipped: Session['skipped']): Ses
   const series = new Map<string, Series>()
 
   for (const { ds, imageId, file } of parsed) {
+    try {
+      addOne(ds, imageId, file)
+    } catch {
+      // one unreadable file never stops the rest of a folder or disc from opening
+      skipped.push({ fileName: file.name, reason: 'Not a DICOM file, or the file is damaged' })
+    }
+  }
+
+  function addOne(ds: DataSet, imageId: string, file: File) {
+    // read everything first: a damaged value throws here, before anything is added
     const studyUid = str(ds, 'x0020000d') || 'unknown-study'
     const seriesUid = str(ds, 'x0020000e') || `unknown-series-${studyUid}`
     const pKey = [txt(ds, 'x00100020'), txt(ds, 'x00100010'), str(ds, 'x00100030')].join('|')
-
-    let p = patients.get(pKey)
-    if (!p) {
-      p = { key: pKey, name: txt(ds, 'x00100010'), id: txt(ds, 'x00100020'), birthDate: str(ds, 'x00100030'), sex: str(ds, 'x00100040'), studies: [] }
-      patients.set(pKey, p)
-    }
-    let st = studies.get(studyUid)
-    if (!st) {
-      st = { studyUid, date: str(ds, 'x00080020'), time: str(ds, 'x00080030'), description: txt(ds, 'x00081030'), accession: txt(ds, 'x00080050'), modalities: [], series: [] }
-      studies.set(studyUid, st)
-      p.studies.push(st)
-    }
-    let se = series.get(seriesUid)
-    if (!se) {
-      se = {
-        seriesUid, studyUid, modality: str(ds, 'x00080060'), number: int(ds, 'x00200011'), description: txt(ds, 'x0008103e'),
-        frameOfReference: str(ds, 'x00200052') || null, rows: ds.uint16('x00280010') ?? null, cols: ds.uint16('x00280011') ?? null,
-        instances: [], imageIds: [],
-      }
-      series.set(seriesUid, se)
-      st.series.push(se)
-      if (se.modality && !st.modalities.includes(se.modality)) st.modalities.push(se.modality)
+    const newPatient: Patient = { key: pKey, name: txt(ds, 'x00100010'), id: txt(ds, 'x00100020'), birthDate: str(ds, 'x00100030'), sex: str(ds, 'x00100040'), studies: [] }
+    const newStudy: Study = { studyUid, date: str(ds, 'x00080020'), time: str(ds, 'x00080030'), description: txt(ds, 'x00081030'), accession: txt(ds, 'x00080050'), modalities: [], series: [] }
+    const newSeries: Series = {
+      seriesUid, studyUid, modality: str(ds, 'x00080060'), number: int(ds, 'x00200011'), description: txt(ds, 'x0008103e'),
+      frameOfReference: str(ds, 'x00200052') || null, rows: ds.uint16('x00280010') ?? null, cols: ds.uint16('x00280011') ?? null,
+      instances: [], imageIds: [],
     }
     const pos = nums(ds, 'x00200032')
+    const frames = int(ds, 'x00280008') ?? 1
     const inst: Instance = {
       imageId,
       sopUid: str(ds, 'x00080018'),
       instanceNumber: int(ds, 'x00200013'),
       position: pos && pos.length === 3 ? [pos[0], pos[1], pos[2]] : null,
       orientation: nums(ds, 'x00200037'),
-      frames: int(ds, 'x00280008') ?? 1,
+      frames: Math.max(1, Math.min(frames, MAX_FRAMES)), // a damaged count must not create a billion images
       transferSyntax: str(ds, 'x00020010'),
       fileName: file.name,
+    }
+
+    let p = patients.get(pKey)
+    if (!p) { p = newPatient; patients.set(pKey, p) }
+    let st = studies.get(studyUid)
+    if (!st) { st = newStudy; studies.set(studyUid, st); p.studies.push(st) }
+    let se = series.get(seriesUid)
+    if (!se) {
+      se = newSeries
+      series.set(seriesUid, se)
+      st.series.push(se)
+      if (se.modality && !st.modalities.includes(se.modality)) st.modalities.push(se.modality)
     }
     if (!se.instances.some((i) => i.sopUid && i.sopUid === inst.sopUid)) se.instances.push(inst)
   }
