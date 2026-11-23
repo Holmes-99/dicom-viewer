@@ -5,6 +5,12 @@ type Bridge = {
   desktop: true
   platform: string
   version(): Promise<string>
+  disc: {
+    caps(): Promise<{ viewer: boolean; viewerBytes: number } | null>
+    begin(): Promise<{ id: string; name: string } | { error: 'canceled' | 'not-empty' | 'denied'; name?: string }>
+    file(id: string, parts: string[], bytes: Uint8Array): Promise<boolean>
+    finish(id: string, withViewer: boolean): Promise<{ name: string; bytes: number; viewer: boolean } | null>
+  }
   onOpenRequest(cb: (files: OpenedFile[]) => void): void
 }
 

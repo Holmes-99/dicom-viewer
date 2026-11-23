@@ -1,6 +1,6 @@
 // Desktop shell (milestone D1). Loads the built viewer from app://viewer/, never from the network.
 // The main process lists and reads files; it never parses DICOM (that stays in the sandboxed renderer).
-const { app, BrowserWindow, ipcMain, protocol, session } = require('electron')
+const { app, BrowserWindow, dialog, ipcMain, protocol, session } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const { Readable } = require('node:stream')
@@ -77,6 +77,8 @@ app.on('open-file', (e, p) => { e.preventDefault(); requestOpen([p]) }) // macOS
 /** token -> absolute path */
 const tokens = new Map()
 const MAX_FILES = 200_000
+// program files that discs carry next to the images (their viewer, autorun); never DICOM, often huge
+const NOT_IMAGES = /\.(exe|dll|pak|asar|dat|bin|inf|ini|txt|json|html?|js|css|ico|lnk|sys|msi|dylib|so|nsh)$/i
 
 function listFiles(paths) {
   const out = []
@@ -84,6 +86,7 @@ function listFiles(paths) {
     if (out.length >= MAX_FILES || depth > 32) return
     let st
     try { st = fs.statSync(p) } catch { return }
+    if (depth > 0 && st.isFile() && NOT_IMAGES.test(p)) return
     if (st.isDirectory()) {
       let names = []
       try { names = fs.readdirSync(p) } catch { return }
@@ -96,6 +99,110 @@ function listFiles(paths) {
   }
   for (const p of paths) walk(p, 0)
   return out
+}
+
+// ------------------------------------------------------------ patient disc folder (D3)
+// The page sends the images and the DICOMDIR it built; this side only writes them into the folder the user
+// picked, under names it checks, then adds the viewer, autorun.inf and a START HERE note.
+const VIEWER_DIR = 'Viewer'
+const VIEWER_EXE = 'DICOM Viewer.exe'
+/** id -> target folder */
+const discs = new Map()
+
+/** what can be copied onto the disc as the viewer: the portable exe, or the installed program folder (Windows only) */
+function viewerSource() {
+  if (!app.isPackaged || process.platform !== 'win32') return null
+  if (process.env.PORTABLE_EXECUTABLE_FILE) return { kind: 'file', path: process.env.PORTABLE_EXECUTABLE_FILE }
+  return { kind: 'dir', path: path.dirname(process.execPath) }
+}
+const skipInViewer = (p) => /^uninstall/i.test(path.basename(p))
+// Electron's fs shows app.asar as a folder; the program folder must be measured and copied as plain files
+const rawFs = require('original-fs')
+
+async function sizeOf(p) {
+  const st = await rawFs.promises.stat(p)
+  if (!st.isDirectory()) return st.size
+  let n = 0
+  for (const e of await rawFs.promises.readdir(p)) if (!skipInViewer(e)) n += await sizeOf(path.join(p, e))
+  return n
+}
+
+/** DICOM File IDs: up to 8 components of 1-8 upper-case letters, digits or _ (PS3.10 / ISO 9660) */
+const validFileId = (parts) => Array.isArray(parts) && parts.length >= 1 && parts.length <= 8
+  && parts.every((c) => typeof c === 'string' && /^[A-Z0-9_]{1,8}$/.test(c))
+
+const START_HERE = (viewer) => [
+  'Patient images',
+  '==============',
+  '',
+  viewer
+    ? `Windows: open the "${VIEWER_DIR}" folder and double-click "${VIEWER_EXE}". The images open by themselves.`
+    : 'This disc has no viewer program on it.',
+  'Mac, or any other computer: open the DICOMDIR file or the DICOM folder with a DICOM viewer.',
+  '',
+  'The viewer is free, needs no installation and never connects to the internet.',
+  'It is not a certified medical device: the doctor reading the images makes the diagnosis.',
+  '',
+].join('\r\n')
+
+ipcMain.handle('disc:caps', async (e) => {
+  if (e.sender !== win?.webContents) return null
+  const src = viewerSource()
+  return { viewer: !!src, viewerBytes: src ? await sizeOf(src.path) : 0 }
+})
+
+ipcMain.handle('disc:begin', async (e) => {
+  if (e.sender !== win?.webContents) return { error: 'denied' }
+  const r = await dialog.showOpenDialog(win, {
+    title: 'Choose an empty folder for the disc',
+    buttonLabel: 'Use this folder',
+    properties: ['openDirectory', 'createDirectory'],
+  })
+  if (r.canceled || !r.filePaths[0]) return { error: 'canceled' }
+  const folder = r.filePaths[0]
+  if ((await fs.promises.readdir(folder)).length) return { error: 'not-empty', name: path.basename(folder) }
+  const id = crypto.randomUUID()
+  discs.set(id, folder)
+  return { id, name: path.basename(folder) }
+})
+
+ipcMain.handle('disc:file', async (e, id, parts, bytes) => {
+  const folder = discs.get(id)
+  if (e.sender !== win?.webContents || !folder || !validFileId(parts) || !(bytes instanceof Uint8Array || bytes instanceof ArrayBuffer)) return false
+  if (parts.length > 1 && parts[0] !== 'DICOM') return false
+  if (parts.length === 1 && parts[0] !== 'DICOMDIR') return false
+  const file = path.join(folder, ...parts)
+  await fs.promises.mkdir(path.dirname(file), { recursive: true })
+  await fs.promises.writeFile(file, Buffer.from(bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : bytes), { flag: 'wx' })
+  return true
+})
+
+ipcMain.handle('disc:finish', async (e, id, withViewer) => {
+  const folder = discs.get(id)
+  if (e.sender !== win?.webContents || !folder) return null
+  discs.delete(id)
+  const src = withViewer ? viewerSource() : null
+  if (src) {
+    const dest = path.join(folder, VIEWER_DIR)
+    if (src.kind === 'file') {
+      await rawFs.promises.mkdir(dest, { recursive: true })
+      await rawFs.promises.copyFile(src.path, path.join(dest, VIEWER_EXE))
+    } else {
+      await rawFs.promises.cp(src.path, dest, { recursive: true, filter: (s) => !skipInViewer(s) })
+    }
+    await fs.promises.writeFile(path.join(folder, 'autorun.inf'),
+      `[autorun]\r\nopen=${VIEWER_DIR}\\${VIEWER_EXE}\r\nicon=${VIEWER_DIR}\\${VIEWER_EXE},0\r\nlabel=Patient images\r\n`)
+  }
+  await fs.promises.writeFile(path.join(folder, 'START HERE.txt'), START_HERE(!!src))
+  return { name: path.basename(folder), bytes: await sizeOf(folder), viewer: !!src }
+})
+
+/** Started from a patient disc with nothing to open: open the disc it sits on (DICOMDIR next to it or one level up). */
+function discNextToApp() {
+  if (!app.isPackaged) return []
+  const dirs = [process.env.PORTABLE_EXECUTABLE_DIR, path.dirname(process.execPath)].filter(Boolean)
+  for (const d of dirs) for (const c of [d, path.dirname(d)]) if (fs.existsSync(path.join(c, 'DICOMDIR'))) return [c]
+  return []
 }
 
 // ------------------------------------------------------------ app:// protocol
@@ -200,6 +307,7 @@ app.whenReady().then(() => {
   ipcMain.handle('viewer:version', () => app.getVersion())
 
   pending.push(...pathsFromArgv(process.argv))
+  if (!pending.length) pending.push(...discNextToApp())
   createWindow()
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow() })
 })

@@ -59,6 +59,8 @@ export interface DataSource {
   openDemo(onProgress?: (p: OpenProgress) => void): Promise<Session>
   /** raw header for the DICOM tags window (S12) */
   getHeader(imageId: string): unknown
+  /** the original file an image came from, unchanged (for the disc folder, D3) */
+  getFile(imageId: string): File | undefined
   closeAll(): void
 }
 

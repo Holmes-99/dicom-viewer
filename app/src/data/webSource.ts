@@ -7,6 +7,7 @@ import { isZip, unzip } from './zip'
 
 // Browser implementation of the data layer. Files stay in memory; nothing leaves the machine.
 const headers = new Map<string, DataSet>()
+const fileOf = new Map<string, File>()
 
 /**
  * Geometry for images that have not been loaded yet. The loader only knows an image's position once it has
@@ -54,6 +55,7 @@ async function index(files: File[], onProgress?: (p: OpenProgress) => void): Pro
         if (!ds.elements.x7fe00010 && !ds.string('x00080018')) throw new Error('no image data')
         const imageId = dicomImageLoader.wadouri.fileManager.add(file)
         headers.set(imageId, ds)
+        fileOf.set(imageId, file)
         parsed.push({ file, imageId, ds })
       } catch {
         skipped.push({ fileName: file.name, reason: 'Not a DICOM file, or the file is damaged' })
@@ -66,10 +68,15 @@ async function index(files: File[], onProgress?: (p: OpenProgress) => void): Pro
   return buildSession(parsed, skipped)
 }
 
+// program files that discs carry next to the images (their viewer, autorun); never DICOM, often huge
+const NOT_IMAGES = /\.(exe|dll|pak|asar|dat|bin|inf|ini|txt|json|html?|js|css|ico|lnk|sys|msi|dylib|so|nsh)$/i
+
 export const webSource: DataSource = {
   async openFiles(files, onProgress, askPassword) {
     const loose: File[] = []
-    for (const f of files) {
+    // files the user picked one by one are always tried; inside a picked folder, program files are left out
+    const picked = files.filter((f) => !(f.webkitRelativePath && NOT_IMAGES.test(f.name)))
+    for (const f of picked) {
       if (isZip(f)) loose.push(...(await unzip(f, askPassword)))
       else loose.push(f)
     }
@@ -89,11 +96,13 @@ export const webSource: DataSource = {
   },
 
   getHeader: (imageId) => headers.get(imageId.split('?')[0]),
+  getFile: (imageId) => fileOf.get(imageId.split('?')[0]),
 
   closeAll() {
     dicomImageLoader.wadouri.fileManager.purge()
     dicomImageLoader.wadouri.dataSetCacheManager.purge()
     headers.clear()
+    fileOf.clear()
   },
 }
 
