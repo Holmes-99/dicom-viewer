@@ -1,11 +1,12 @@
 import dicomImageLoader from '@cornerstonejs/dicom-image-loader'
 import { metaData } from '@cornerstonejs/core'
 import type { DataSet } from 'dicom-parser'
-import { buildSession, isDicomDir, parseHeader, type Parsed } from './index-files'
+import { buildSession, inflateIfNeeded, isDicomDir, parseHeader, type Parsed } from './index-files'
 import type { DataSource, OpenProgress, Session } from './types'
 import { isZip, unzip } from './zip'
 
 // Browser implementation of the data layer. Files stay in memory; nothing leaves the machine.
+export const DISC_INDEX = 'That is the disc’s index (DICOMDIR). Open the whole disc folder instead.'
 const headers = new Map<string, DataSet>()
 const fileOf = new Map<string, File>()
 
@@ -47,24 +48,29 @@ async function index(files: File[], onProgress?: (p: OpenProgress) => void): Pro
   let done = 0
   const total = files.length
   const BATCH = 16
+  let sawIndex = false
   for (let i = 0; i < files.length; i += BATCH) {
-    await Promise.all(files.slice(i, i + BATCH).map(async (file) => {
+    await Promise.all(files.slice(i, i + BATCH).map(async (original) => {
       try {
+        const file = await inflateIfNeeded(original)
         const ds = await parseHeader(file)
-        if (isDicomDir(ds)) return // the folder scan already finds every file; DICOMDIR only speeds that up on discs
+        // the folder scan already finds every file; the desktop app opens the whole disc when given its DICOMDIR
+        if (isDicomDir(ds)) { sawIndex = true; return }
         if (!ds.elements.x7fe00010 && !ds.string('x00080018')) throw new Error('no image data')
         const imageId = dicomImageLoader.wadouri.fileManager.add(file)
         headers.set(imageId, ds)
         fileOf.set(imageId, file)
         parsed.push({ file, imageId, ds })
       } catch {
-        skipped.push({ fileName: file.name, reason: 'Not a DICOM file, or the file is damaged' })
+        skipped.push({ fileName: original.name, reason: 'Not a DICOM file, or the file is damaged' })
       } finally {
         done++
       }
     }))
     onProgress?.({ done, total })
   }
+  // a DICOMDIR picked on its own: the browser cannot reach the files next to it
+  if (sawIndex && !parsed.length) skipped.push({ fileName: 'DICOMDIR', reason: DISC_INDEX })
   return buildSession(parsed, skipped)
 }
 

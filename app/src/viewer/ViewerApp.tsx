@@ -8,7 +8,7 @@ import { Button, Checkbox } from '../ui/controls'
 import { Dialog, DialogClose, Progress, Toast, TooltipProvider, type MenuEntry } from '../ui/overlays'
 import { DataTable, type Column } from '../ui/DataTable'
 import { Popover } from 'radix-ui'
-import { webSource, filesFromDrop } from '../data/webSource'
+import { webSource, filesFromDrop, DISC_INDEX } from '../data/webSource'
 import { desktop, fetchOpened } from '../data/desktop'
 import { allSeries, findSeries, studyOf, type OpenProgress, type Series, type Session } from '../data/types'
 import { initEngine, setActiveTool, setReferenceSource, setSyncedViewports, stackViewport, type ToolId } from './engine'
@@ -81,7 +81,8 @@ export default function ViewerApp() {
   const loadSession = useCallback((s: Session) => {
     const list = allSeries(s)
     if (!list.length) {
-      setToast({ tone: 'danger', title: 'No images found', body: s.skipped.length ? `${s.skipped.length} files were not DICOM images.` : 'The selection was empty.' })
+      const index = s.skipped.find((f) => f.reason === DISC_INDEX)
+      setToast({ tone: 'danger', title: 'No images found', body: index ? DISC_INDEX : s.skipped.length ? `${s.skipped.length} files were not DICOM images.` : 'The selection was empty.' })
       return
     }
     // first panel: the series with the most images (VERIFY: which series the original shows first)

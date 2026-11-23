@@ -97,7 +97,11 @@ function listFiles(paths) {
       out.push({ token, name: path.basename(p), size: st.size })
     }
   }
-  for (const p of paths) walk(p, 0)
+  // a disc's DICOMDIR (double-click, "Open with", command line) stands for the whole disc it indexes
+  const seen = new Set()
+  for (const p of paths.map((q) => (path.basename(q).toUpperCase() === 'DICOMDIR' ? path.dirname(q) : q))) {
+    if (!seen.has(p)) { seen.add(p); walk(p, 0) }
+  }
   return out
 }
 

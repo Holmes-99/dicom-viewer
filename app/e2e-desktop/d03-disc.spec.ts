@@ -105,6 +105,13 @@ test('D03-H1 the disc folder has every image, a valid DICOMDIR and a START HERE 
   const again = await launch([disc])
   await expect(firstPanel(again.page)).toHaveAccessibleName(/Axial 2\.5 mm lung, image 1 of 80/, { timeout: 30_000 })
   await expect(again.page.getByRole('listbox', { name: 'Series' }).getByRole('option')).toHaveCount(4)
+  await again.app.close()
+
+  // D03-H2: double-clicking the disc's DICOMDIR opens the whole disc
+  const byIndex = await launch([join(disc, 'DICOMDIR')])
+  await expect(firstPanel(byIndex.page)).toHaveAccessibleName(/Axial 2\.5 mm lung, image 1 of 80/, { timeout: 30_000 })
+  await expect(byIndex.page.getByRole('listbox', { name: 'Series' }).getByRole('option')).toHaveCount(4)
+  await byIndex.app.close()
 
   if (!EXE || process.platform !== 'win32') {
     // development build, or macOS: no viewer to copy (the disc viewer is Windows only)

@@ -65,6 +65,13 @@ test.describe('F01 open files', () => {
     await expect(page.getByRole('heading', { name: 'Open a study' })).toBeVisible()
   })
 
+  test('F01-E13 a DICOMDIR picked on its own says to open the disc folder', async ({ page }) => {
+    await page.goto('/')
+    await openFiles(page, [FILES.dicomdir])
+    await expect(page.getByText('No images found')).toBeVisible()
+    await expect(page.getByText(/Open the whole disc folder instead/)).toBeVisible()
+  })
+
   test('F01-E2 + F01-E3 mixed with junk and a damaged file', async ({ page }) => {
     await page.goto('/')
     await openFiles(page, [FILES.other1, FILES.other2, FILES.text, FILES.damaged])
