@@ -18,7 +18,7 @@ Rotate and flip,2D,must,yes,yes,Ctrl+R / Ctrl+H and the menu; Esc resets; checke
 Invert (negative),2D,must,yes,yes,I
 Overlay text corners (patient/study/slice/WL),2D,must,yes,yes,Ctrl+T toggles it
 Split layouts up to 5x5,layout,must,yes,yes,1x2 verified
-Cine playback with fps,2D,must,yes,yes,C or the film button; 1-60 fps slider; loop or bounce; measured in the desktop window (e2e-desktop D04-H1): 15.3 fps at 15 and 30.3 fps at 30 on the demo CT
+Cine playback with fps,2D,must,yes,yes,C or the film button; 1-60 fps slider; loop or bounce; measured in the desktop window (e2e-desktop D04-H1): 15.3 fps at 15 and 30.3 fps at 30 on the demo CT (this PC and GitHub Windows); GitHub's Mac has no GPU so there it only checks playback runs; real Mac not measured
 Auto sync series in the same plane,sync,must,yes,yes,on by default (VERIFY); links panels with the same frame of reference and plane; two axial series stayed on the same Z
 Cross-reference lines,sync,must,yes,yes,the active panel's plane is drawn on the others; follows scrolling (axial and coronal checked)
 Length measurement in mm,measure,must,yes,yes,
