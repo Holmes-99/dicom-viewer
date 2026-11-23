@@ -106,8 +106,8 @@ test('D03-H1 the disc folder has every image, a valid DICOMDIR and a START HERE 
   await expect(firstPanel(again.page)).toHaveAccessibleName(/Axial 2\.5 mm lung, image 1 of 80/, { timeout: 30_000 })
   await expect(again.page.getByRole('listbox', { name: 'Series' }).getByRole('option')).toHaveCount(4)
 
-  if (!EXE) {
-    // development build: no viewer to copy
+  if (!EXE || process.platform !== 'win32') {
+    // development build, or macOS: no viewer to copy (the disc viewer is Windows only)
     expect(existsSync(join(disc, 'autorun.inf'))).toBe(false)
     expect(readFileSync(join(disc, 'START HERE.txt'), 'utf8')).toMatch(/no viewer program/)
     return
