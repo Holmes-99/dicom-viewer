@@ -78,7 +78,26 @@ The demo study now also has a coronal series (series 5, 48 slices, same frame of
 - `package.json`: the viewer's libraries moved to devDependencies. Vite bundles them into `dist/`, so the program ships only `dist/` and `electron/`, not `node_modules`.
 - Not tried yet: running the installer on a clean Windows 10/11 PC, double-clicking a `.dcm` after install, the portable exe from a USB stick, and the dmg on a Mac.
 
+## D3 patient disc folder: what was built and checked (2026-11-23)
+
+- **Export images ▾ → Prepare disc folder…** (desktop app only) shows what will go on the disc and its size. It asks for an empty folder and writes:
+  - `DICOM/PAT00001/STU00001/SER00001/IMG00001…`: every open image, byte for byte unchanged, under 8-character names that are safe on any disc format.
+  - `DICOMDIR`: the index other viewers and PACS import read (patient → study → series → image). Names and descriptions are copied from each file with its own character set, so accents and non-Latin names stay right. Writer: `src/data/dicomdir.ts`.
+  - `START HERE.txt`: how to open the images, on Windows and elsewhere.
+  - On Windows, from the installed or portable version: the viewer itself in `Viewer/` plus `autorun.inf`. Started from the disc with nothing to open, the viewer finds the DICOMDIR next to it and opens the study. Windows 10/11 no longer run discs automatically, which is why the note exists.
+- The result says whether it fits on a CD (700 MB), needs a DVD, or needs a USB stick. The app doesn't burn discs: Windows and macOS already can.
+- Opening a folder now skips program files (`.exe`, `.dll`, `.txt`…) inside it, so a disc carrying a viewer (ours or another company's) doesn't read hundreds of MB of program files. Files picked one by one are still all tried.
+- Check `e2e-desktop/d03-disc.spec.ts`:
+  - makes the disc from the demo study and finds all 209 images under valid names
+  - parses the DICOMDIR and follows every link from the root: 1 patient, 1 study, 4 series, 209 images, each pointing to a file that exists with the same SOP instance and class
+  - refuses a folder that isn't empty
+  - reopens the disc folder and gets the same 4 series
+  - on the packaged build, checks the viewer was copied and starts it from the disc with nothing to open; it shows the study
+- Results: 6 of 6 desktop checks pass in development and 6 of 6 against the packaged program. The 41 browser tests pass.
+- Harder than expected: inside the packaged app, Electron's file functions show `app.asar` as a folder, so copying the installed program onto the disc failed. The copy now uses the plain file system (`original-fs`). Only the packaged check caught this.
+- Not tried yet: burning a real CD/DVD and starting the viewer from it on another PC.
+
 ## Next
 
-1. D3 patient CD folder.
-3. The partial must-haves (DICOMDIR use, codec files, fuzz suite, cine fps).
+1. The partial must-haves (reading DICOMDIR to speed up opening a disc, codec test files, fuzz suite, cine fps).
+2. `/replica-brand`: name, icon and colours, which also gives the disc its own logo.

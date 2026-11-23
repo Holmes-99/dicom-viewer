@@ -75,7 +75,7 @@ Interface translations (30+),i18n,could,yes,no,write fresh; the original's commu
 Settings screen (original uses options.xml),settings,could,partial,no,improvement over original
 Command line and radiant:// URL protocol,integration,could,yes,skip,their protocol name and CLI are theirs; design your own
 Licensing / trial / activation,license,could,yes,skip,clone is free
-CD/DVD autorun edition with custom logo,distribution,must,yes,no,ground rule 5: Export > Prepare disc folder (study + DICOMDIR + portable viewer); milestone D3
+CD/DVD autorun edition with custom logo,distribution,must,yes,yes,D3: Export ▾ → Prepare disc folder: images + DICOMDIR + START HERE + (Windows) the viewer and autorun.inf; the viewer opens the disc by itself; e2e-desktop D03-H1; custom logo waits for the brand; not burned to a real disc yet
 Desktop app: Windows installer (per-user; .dcm and DICOMDIR associated),distribution,must,yes,partial,D2: npm run dist builds a per-user NSIS installer (no admin) with .dcm/.dicom associated; the packaged program passes the D1 checks; installing on a clean PC not tried yet; DICOMDIR has no file extension so it can only be opened through Open with or the app
 Portable Windows version (no install),distribution,must,yes,partial,D2: one exe built; settings go next to it when writable else to temp; not launched by the tests yet (same program as the checked one)
 Mac app (.dmg; Apple Silicon + Intel),distribution,must,yes,partial,D2: universal dmg built on GitHub's Mac machine and the 5 desktop checks pass on macOS (run 45084664960); not yet opened by a person on a real Mac; unsigned (right-click → Open the first time)
