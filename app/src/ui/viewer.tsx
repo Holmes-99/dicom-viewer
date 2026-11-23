@@ -237,9 +237,9 @@ export function CineControl(props: {
       <button aria-label={playing ? 'Pause' : 'Play'} onClick={() => setPlaying(!playing)} className="grid size-7 place-items-center rounded-md hover:bg-surface-hover">
         {playing ? <Pause size={16} /> : <Play size={16} />}
       </button>
-      <Slider.Root value={[fps]} min={1} max={60} step={1} onValueChange={([v]) => setFps(v)} className="relative flex h-5 w-32 items-center" aria-label="Frames per second">
+      <Slider.Root value={[fps]} min={1} max={60} step={1} onValueChange={([v]) => setFps(v)} className="relative flex h-5 w-32 items-center">
         <Slider.Track className="relative h-1 flex-1 rounded-sm bg-bg"><Slider.Range className="absolute h-full rounded-sm bg-accent" /></Slider.Track>
-        <Slider.Thumb aria-valuetext={`${fps} frames per second`} className="block size-3.5 rounded-full border-2 border-accent bg-fg" />
+        <Slider.Thumb aria-label="Frames per second" aria-valuetext={`${fps} frames per second`} className="block size-3.5 rounded-full border-2 border-accent bg-fg" />
       </Slider.Root>
       <span className="w-12 font-mono text-xs tabular-nums text-muted">{fps} fps</span>
       <button aria-label={loop ? 'Loop (click for bounce)' : 'Bounce (click for loop)'} onClick={() => setLoop(!loop)} className="grid size-7 place-items-center rounded-md text-muted hover:bg-surface-hover hover:text-fg">
