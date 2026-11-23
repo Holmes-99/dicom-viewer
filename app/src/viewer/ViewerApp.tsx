@@ -19,6 +19,7 @@ import { StackPanel } from './StackPanel'
 import { SeriesThumb } from './SeriesThumb'
 import { TagsDialog } from './TagsDialog'
 import { CalibrateDialog, ExportDialog, PasswordDialog } from './dialogs'
+import { DiscDialog } from './DiscDialog'
 import { fmtDate } from './format'
 import { ZipPasswordError } from '../data/zip'
 import type { DataSet } from 'dicom-parser'
@@ -54,6 +55,7 @@ export default function ViewerApp() {
   const [refLines, setRefLines] = useState(true)
   const [tags, setTags] = useState<{ header: DataSet | null; title: string } | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
+  const [discOpen, setDiscOpen] = useState(false)
   const [calib, setCalib] = useState<{ length: number; unit: string } | null | false>(false)
   const [pwRequest, setPwRequest] = useState<{ zipName: string; retry: boolean } | null>(null)
   const pwAnswer = useRef<((p: string | null) => void) | null>(null)
@@ -325,7 +327,11 @@ export default function ViewerApp() {
           {soon('3D MPR', <Columns2 size={I} />)}
           {soon('Volume rendering', <Cuboid size={I} />)}
           <ToolSep />
-          <ToolButton icon={<Download size={I} />} label="Export images" shortcut="Ctrl+S" onClick={() => setExportOpen(true)} disabled={!session} />
+          <ToolButton icon={<Download size={I} />} label="Export images" shortcut="Ctrl+S" onClick={() => setExportOpen(true)} disabled={!session}
+            menu={[
+              { label: 'Export images…', shortcut: 'Ctrl+S', onSelect: () => setExportOpen(true) },
+              { label: desktop ? 'Prepare disc folder…' : 'Prepare disc folder… (desktop app)', icon: <Disc size={14} />, disabled: !desktop, onSelect: () => setDiscOpen(true) },
+            ]} />
           {soon('Print', <Printer size={I} />)}
           <ToolButton icon={<Tags size={I} />} label="DICOM tags" shortcut="F2" onClick={openTags} disabled={!session} />
           <div className="flex-1" />
@@ -398,6 +404,8 @@ export default function ViewerApp() {
 
         <ExportDialog key={`export-${exportOpen}`} open={exportOpen} onOpenChange={setExportOpen} viewportId={activeId}
           getElement={() => panelEls.current[active] ?? null} baseName={exportName} onDone={setToast} />
+
+        <DiscDialog key={`disc-${discOpen}`} open={discOpen} onOpenChange={setDiscOpen} session={session} source={source} onDone={setToast} />
 
         <CalibrateDialog key={`calib-${calib ? calib.length : String(calib)}`} open={calib !== false} onOpenChange={(v) => { if (!v) setCalib(false) }} measured={calib || null}
           onApply={(mm) => {
