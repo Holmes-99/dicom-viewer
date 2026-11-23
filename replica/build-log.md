@@ -97,7 +97,17 @@ The demo study now also has a coronal series (series 5, 48 slices, same frame of
 - Harder than expected: inside the packaged app, Electron's file functions show `app.asar` as a folder, so copying the installed program onto the disc failed. The copy now uses the plain file system (`original-fs`). Only the packaged check caught this.
 - Not tried yet: burning a real CD/DVD and starting the viewer from it on another PC.
 
+## Partial must-haves closed (2026-11-23)
+
+- **Codecs (F01-E12, `e2e/f01-codecs.spec.ts`).** `e2e/codecs.ts` builds a synthetic file for each format during test setup, with no downloads. It uses the codec libraries' own encoders (JPEG-LS, JPEG 2000, HTJ2K, baseline JPEG) plus a small JPEG lossless encoder and RLE encoder written here, and zlib for deflate. Each file is opened and the rendered pixels are checked: inside the disc is white (or red for colour), the background black (or blue). 10 of 10 pass: JPEG lossless, baseline grey, JPEG-LS, JPEG 2000, HTJ2K, RLE, deflate, US colour YBR_FULL, JPEG YBR_FULL_422 and RLE RGB.
+- **Deflate** failed at first because the header reader had no inflater. Deflated files are now unpacked once on open with the browser's own `DecompressionStream` (`inflateIfNeeded` in `index-files.ts`) and handled as ordinary explicit little endian.
+- **Damaged files (F01-E14, `e2e/f01-fuzz.spec.ts`).** Seeded, so every failure reproduces. 3000 damaged headers go through the reader and the series builder. Then 120 damaged files are opened in the viewer, every series is paged through, and the demo must still open afterwards. **It found a real bug:** a file whose element length ran past its end was accepted, then made the series builder throw, and one such file stopped a whole folder from opening. The reader now checks every element's bounds, the builder reads a file completely before adding it and skips it if that fails, and a damaged frame count is capped at 20 000.
+- **DICOMDIR.** In the desktop app, double-clicking or "Open with" on a DICOMDIR opens the whole disc (D03-H2). In the browser, a DICOMDIR picked alone explains that the folder should be opened instead (F01-E13). Reading DICOMDIR to skip header reads was left out: reading headers of a whole CD takes seconds.
+- **Cine (D04-H1, `e2e-desktop/d04-cine.spec.ts`).** Measured in the desktop window: 15.3 fps at 15 and 30.3 fps at 30.
+- The frame-rate slider's handle had no accessible name (the label was on its container); fixed.
+- Results: 54 of 54 browser tests and 7 of 7 desktop checks pass.
+
 ## Next
 
-1. The partial must-haves (reading DICOMDIR to speed up opening a disc, codec test files, fuzz suite, cine fps).
-2. `/replica-brand`: name, icon and colours, which also gives the disc its own logo.
+1. `/replica-brand`: name, icon and colours, which also gives the disc its own logo.
+2. Should-haves, in build order (MPR, archive, more measurement tools).

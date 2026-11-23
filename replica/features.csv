@@ -1,14 +1,14 @@
 feature,area,priority,original,clone,notes
 Open DICOM files and folders,open,must,yes,yes,F01; folder and file pickers (Ctrl+O / Ctrl+Shift+O); browser data layer until the Electron shell exists (D1)
-Open CD/DVD/USB with or without DICOMDIR,open,must,yes,partial,a disc opens as a folder (every file is scanned); DICOMDIR is skipped rather than used to speed up
+Open CD/DVD/USB with or without DICOMDIR,open,must,yes,yes,a disc opens as a folder (every file is scanned; program files skipped); desktop: double-clicking a DICOMDIR opens the whole disc (e2e-desktop D03-H2); browser: a DICOMDIR picked alone says to open the folder (F01-E13); DICOMDIR is not used to skip reading headers (not needed at disc sizes)
 Open ZIP including AES password ZIP,open,must,yes,yes,Open menu or drop; plain and AES ZIPs checked; wrong password asks again; cancel stops cleanly
 Drag and drop files onto window,open,must,yes,yes,files and whole folders
 Uncompressed transfer syntaxes (implicit/explicit LE/BE),codecs,must,yes,yes,explicit LE (demo); implicit LE and explicit BE render (e2e F01-E6 / F01-E7)
-JPEG baseline/lossless and JPEG-LS,codecs,must,yes,partial,codecs are bundled; no test files yet
-JPEG 2000 and High-Throughput JPEG 2000,codecs,must,yes,partial,codecs are bundled; no test files yet
-RLE and Deflated LE,codecs,must,yes,partial,RLE is in the loader; deflate not tested
-Multi-frame and US YBR colour images,codecs,must,yes,partial,multi-frame checked (e2e F01-E8: one image per frame); US YBR colour not tested yet
-Safe parsing of malformed files,security,must,yes,partial,headers are read without pixel data and damaged files are skipped with a count; no fuzz suite yet
+JPEG baseline/lossless and JPEG-LS,codecs,must,yes,yes,e2e F01-E12: synthetic files (e2e/codecs.ts) decode to the right picture: JPEG lossless (own encoder) / baseline 8-bit / JPEG-LS 12-bit
+JPEG 2000 and High-Throughput JPEG 2000,codecs,must,yes,yes,e2e F01-E12: JPEG 2000 and HTJ2K lossless 12-bit decode to the right picture
+RLE and Deflated LE,codecs,must,yes,yes,e2e F01-E12: RLE grey 16-bit and RGB; deflated files are unpacked on open (inflateIfNeeded) so loader and disc export see a plain file
+Multi-frame and US YBR colour images,codecs,must,yes,yes,multi-frame (F01-E8); US colour YBR_FULL / JPEG YBR_FULL_422 / RLE RGB render red-on-blue correctly (F01-E12)
+Safe parsing of malformed files,security,must,yes,yes,seeded fuzz suite F01-E14: 3000 damaged headers through reader + series builder and 120 damaged files paged through in the viewer; it found one bug (an element running past the end of the file broke the whole open) now fixed; frame count capped at 20000
 Series thumbnail bar,browse,must,yes,yes,S02; drag a thumbnail onto any panel; panel number badge
 Open series window with search and sort (F4),browse,must,yes,yes,S03; type to filter and press Enter
 Stack scroll with mouse wheel,2D,must,yes,yes,also arrows / PageUp / PageDown / Home / End
@@ -18,7 +18,7 @@ Rotate and flip,2D,must,yes,yes,Ctrl+R / Ctrl+H and the menu; Esc resets; checke
 Invert (negative),2D,must,yes,yes,I
 Overlay text corners (patient/study/slice/WL),2D,must,yes,yes,Ctrl+T toggles it
 Split layouts up to 5x5,layout,must,yes,yes,1x2 verified
-Cine playback with fps,2D,must,yes,partial,C or the film button; 1-60 fps slider; loop or bounce; plays and pauses; the real frame rate was not measured (the test browser was throttled)
+Cine playback with fps,2D,must,yes,yes,C or the film button; 1-60 fps slider; loop or bounce; measured in the desktop window (e2e-desktop D04-H1): 15.3 fps at 15 and 30.3 fps at 30 on the demo CT
 Auto sync series in the same plane,sync,must,yes,yes,on by default (VERIFY); links panels with the same frame of reference and plane; two axial series stayed on the same Z
 Cross-reference lines,sync,must,yes,yes,the active panel's plane is drawn on the others; follows scrolling (axial and coronal checked)
 Length measurement in mm,measure,must,yes,yes,
