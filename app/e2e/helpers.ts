@@ -10,11 +10,13 @@ export const fixture = (name: string) => join(FIX, name)
  * Every test fails on a console error or a 5xx response (checked after the test, so the failure names the message).
  * `acceptNotice: false` keeps the first-run notice for the tests that check it.
  */
-export const test = base.extend<{ acceptNotice: boolean; guard: void }>({
+export const test = base.extend<{ acceptNotice: boolean; logErrorsAllowed: boolean; guard: void }>({
   acceptNotice: [true, { option: true }],
-  guard: [async ({ page, acceptNotice }, use) => {
+  /** damaged-file tests: a decoder may log an error for a broken image; uncaught page errors still fail */
+  logErrorsAllowed: [false, { option: true }],
+  guard: [async ({ page, acceptNotice, logErrorsAllowed }, use) => {
     const problems: string[] = []
-    page.on('console', (m) => { if (m.type() === 'error') problems.push(`console error: ${m.text()}`) })
+    page.on('console', (m) => { if (m.type() === 'error' && !logErrorsAllowed) problems.push(`console error: ${m.text()}`) })
     page.on('pageerror', (e) => problems.push(`page error: ${e.message}`))
     page.on('response', (r) => { if (r.status() >= 500) problems.push(`${r.status()} on ${r.url()}`) })
     if (acceptNotice) await page.addInitScript(() => { try { localStorage.setItem('viewer.notice.v1', '1') } catch { /* ignore */ } })
