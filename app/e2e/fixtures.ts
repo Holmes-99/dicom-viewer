@@ -3,6 +3,9 @@ import { mkdirSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { execSync } from 'node:child_process'
 import { BlobReader, BlobWriter, ZipWriter } from '@zip.js/zip.js'
+import dicomParser from 'dicom-parser'
+import { buildCodecFixtures } from './codecs'
+import { writeDicomDir } from '../src/data/dicomdir'
 
 export const FIX = join(import.meta.dirname, '.fixtures')
 export const DEMO = join(import.meta.dirname, '..', 'public', 'demo')
@@ -95,7 +98,7 @@ export const LONG_NAME = 'Ångström-Müller^Zoë-Élodie Façade 😀 Ñandú �
 export const FILES = {
   other1: 'other_patient_1.dcm', other2: 'other_patient_2.dcm',
   implicit: 'implicit_vr.dcm', bigEndian: 'big_endian.dcm', multiframe: 'multiframe.dcm',
-  damaged: 'damaged.dcm', text: 'notes.txt', plainZip: 'study.zip', aesZip: 'locked.zip',
+  damaged: 'damaged.dcm', text: 'notes.txt', plainZip: 'study.zip', aesZip: 'locked.zip', dicomdir: 'DICOMDIR',
 }
 export const ZIP_PASSWORD = 'e2e-only-password'
 
@@ -127,4 +130,8 @@ export async function buildFixtures() {
   }
   await zip(FILES.plainZip)
   await zip(FILES.aesZip, ZIP_PASSWORD)
+  for (const [name, data] of await buildCodecFixtures()) writeFileSync(join(FIX, name), data)
+  // a disc index on its own, pointing at one image
+  const ds = dicomParser.parseDicom(other1, { untilTag: 'x7fe00010' })
+  writeFileSync(join(FIX, FILES.dicomdir), writeDicomDir([{ fileId: ['DICOM', 'IMG1'], ds }]))
 }
