@@ -11,4 +11,4 @@ A free, offline desktop viewer for medical images (CT, MR, X-ray, ultrasound, PE
 
 ## Status
 
-The design system and UI primitives are done. The viewer core (opening DICOM files, the image viewport) is in progress.
+Feature-complete and in everyday use: I built it for my father and brother, and they and some of their doctor colleagues use it. What's left is polish, such as the app icon.
